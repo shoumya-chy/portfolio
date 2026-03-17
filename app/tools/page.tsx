@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Wrench, ArrowRight } from "lucide-react";
+import { Wrench, Sparkles, Search, Code, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -11,21 +11,27 @@ export const metadata: Metadata = {
 const tools = [
   {
     title: "Content Ideas Generator",
-    desc: "AI-powered tool that generates content ideas and topic clusters for your niche.",
-    status: "Coming Soon",
+    desc: "AI-powered tool that aggregates data from Google Search Console, Bing, and Reddit to generate strategic content ideas using Claude AI.",
+    status: "Live",
     color: "var(--color-accent)",
+    icon: Sparkles,
+    href: "/tools/content-ideas",
   },
   {
     title: "404 Finder",
     desc: "Scan any URL and instantly find broken links that hurt your SEO rankings.",
     status: "Coming Soon",
     color: "var(--color-green)",
+    icon: Search,
+    href: "#",
   },
   {
     title: "Meta Tag Analyzer",
     desc: "Check if your pages have proper meta tags, Open Graph, and structured data.",
     status: "Coming Soon",
     color: "var(--color-purple)",
+    icon: Code,
+    href: "#",
   },
 ];
 
@@ -48,39 +54,50 @@ export default function ToolsPage() {
           Free SEO &amp; Web Tools
         </h1>
         <p className="mt-3 text-[var(--color-text-muted)] max-w-2xl">
-          A collection of free tools I&apos;m building to help developers and
-          marketers improve their web presence.
+          A collection of tools I build to solve real SEO and web development
+          problems. Each tool is powered by real data and AI.
         </p>
 
         <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tools.map((tool, i) => (
-            <div
-              key={i}
-              className="group p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl card-glow"
-            >
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
-                style={{
-                  backgroundColor: `color-mix(in srgb, ${tool.color} 15%, transparent)`,
-                }}
+          {tools.map((tool, i) => {
+            const isLive = tool.status === "Live";
+            const Wrapper = isLive ? Link : "div";
+
+            return (
+              <Wrapper
+                key={i}
+                href={tool.href}
+                className={`group p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl card-glow transition-all ${
+                  isLive ? "cursor-pointer hover:border-[var(--color-border-hover)]" : ""
+                }`}
               >
-                <Wrench size={18} style={{ color: tool.color }} />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">{tool.title}</h3>
-              <p className="text-sm text-[var(--color-text-muted)] mb-4">
-                {tool.desc}
-              </p>
-              <span
-                className="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-md border"
-                style={{
-                  color: tool.color,
-                  borderColor: tool.color,
-                }}
-              >
-                {tool.status}
-              </span>
-            </div>
-          ))}
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${tool.color} 15%, transparent)`,
+                  }}
+                >
+                  <tool.icon size={18} style={{ color: tool.color }} />
+                </div>
+                <h3 className="text-lg font-semibold mb-2 group-hover:text-[var(--color-accent)] transition-colors">
+                  {tool.title}
+                </h3>
+                <p className="text-sm text-[var(--color-text-muted)] mb-4">
+                  {tool.desc}
+                </p>
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-md border"
+                  style={{
+                    color: tool.color,
+                    borderColor: tool.color,
+                  }}
+                >
+                  {tool.status}
+                  {isLive && <ArrowRight size={12} />}
+                </span>
+              </Wrapper>
+            );
+          })}
         </div>
       </div>
     </section>
