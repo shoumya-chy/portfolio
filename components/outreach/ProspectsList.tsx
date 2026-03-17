@@ -98,7 +98,9 @@ export function ProspectsList({ prospects, projectId, onRefresh }: Props) {
                       {getStateLabel(prospect.state)}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--color-text-dim)] font-mono truncate">{prospect.contactEmail}</p>
+                  <p className={`text-xs font-mono truncate ${prospect.contactEmail ? "text-[var(--color-text-dim)]" : "text-orange-400"}`}>
+                    {prospect.contactEmail || "No email found — check site manually"}
+                  </p>
                   {prospect.lastEmailSentAt && (
                     <p className="text-xs text-[var(--color-text-dim)] mt-1">
                       Last activity:{" "}

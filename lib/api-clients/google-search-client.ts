@@ -17,7 +17,7 @@ export async function searchWriteForUs(
   const queries = [
     `${nichePrefix}"write for us"`,
     `${nichePrefix}"guest post"`,
-    `${nichePrefix}"contribute"`,
+    `${nichePrefix}"contribute" "guest"`,
     `${nichePrefix}"submit a guest post"`,
   ];
 
@@ -34,22 +34,36 @@ export async function searchWriteForUs(
         num: "10",
       });
 
-      const res = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`);
+      const url = `https://www.googleapis.com/customsearch/v1?${params}`;
+      console.log(`[GoogleCSE] Searching: ${query}`);
+
+      const res = await fetch(url);
+
       if (!res.ok) {
-        console.log(`[GoogleCSE] Query failed: ${res.status}`);
+        const errorBody = await res.text();
+        console.log(`[GoogleCSE] Query failed: ${res.status} - ${errorBody.substring(0, 200)}`);
         continue;
       }
 
       const data = await res.json();
       const items = data.items || [];
+      console.log(`[GoogleCSE] Got ${items.length} results for: ${query}`);
 
       for (const item of items) {
-        const url = item.link;
-        const domain = new URL(url).hostname.replace("www.", "");
+        const itemUrl = item.link;
+        let domain: string;
+        try {
+          domain = new URL(itemUrl).hostname.replace("www.", "");
+        } catch {
+          continue;
+        }
 
         // Check domain extension filter
         if (domainFilters.length > 0) {
-          const matchesFilter = domainFilters.some(ext => domain.endsWith(ext.replace(".", "")));
+          const matchesFilter = domainFilters.some(ext => {
+            const cleanExt = ext.trim().replace(/^\./, "");
+            return domain.endsWith(cleanExt);
+          });
           if (!matchesFilter) continue;
         }
 
@@ -57,7 +71,7 @@ export async function searchWriteForUs(
         seenDomains.add(domain);
 
         results.push({
-          url,
+          url: itemUrl,
           title: item.title || "",
           snippet: item.snippet || "",
           domain,
@@ -68,5 +82,6 @@ export async function searchWriteForUs(
     }
   }
 
+  console.log(`[GoogleCSE] Total unique results: ${results.length}`);
   return results;
 }

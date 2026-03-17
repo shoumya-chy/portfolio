@@ -35,8 +35,8 @@ export async function sendOutreachBatch(
     const site = sites.find((s) => s.id === project.siteId);
     const siteUrl = site?.url || project.emailAddress.split("@")[1] || "";
 
-    // Get prospects ready to email
-    const prospects = listProspects(project.id, "found");
+    // Get prospects ready to email (only those with contact emails)
+    const prospects = listProspects(project.id, "found").filter(p => p.contactEmail);
     const batch = prospects.slice(0, remainingQuota);
 
     for (const prospect of batch) {
