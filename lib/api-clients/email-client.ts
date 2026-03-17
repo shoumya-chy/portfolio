@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import { ImapFlow } from "imapflow";
 import type { SmtpConfig, ImapConfig } from "@/lib/outreach/types";
 
 export interface SendEmailOptions {
@@ -51,6 +50,9 @@ export interface InboxMessage {
 }
 
 export async function fetchInboxEmails(config: ImapConfig, since: Date): Promise<InboxMessage[]> {
+  // Dynamic import to avoid crashing the module if imapflow has issues
+  const { ImapFlow } = await import("imapflow");
+
   const client = new ImapFlow({
     host: config.host,
     port: config.port,

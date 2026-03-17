@@ -24,6 +24,17 @@ export function OutreachDashboard({ onLogout }: Props) {
   const setErrorKey = (key: string, val: string) =>
     setErrors((p) => ({ ...p, [key]: val }));
 
+  // Safe JSON parser — handles HTML error pages from server crashes
+  const safeJson = async (res: Response) => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      // Server returned HTML error page instead of JSON
+      throw new Error(`Server error (${res.status}): ${text.substring(0, 100).replace(/<[^>]+>/g, "").trim() || "Internal server error"}`);
+    }
+  };
+
   // Fetch projects on mount
   useEffect(() => {
     fetch("/api/tools/guest-post-outreach/projects")
@@ -70,15 +81,15 @@ export function OutreachDashboard({ onLogout }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: selectedProjectId }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       // Refresh prospects after finding sites
       const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
-      const prospectsData = await prospectsRes.json();
+      const prospectsData = await safeJson(prospectsRes);
       setProspects(prospectsData.prospects || []);
       // Refresh stats
       const statsRes = await fetch(`/api/tools/guest-post-outreach/stats?projectId=${selectedProjectId}`);
-      const statsData = await statsRes.json();
+      const statsData = await safeJson(statsRes);
       setStats(statsData.stats || null);
       const debugInfo = data.debug ? ` (${data.debug.join(" → ")})` : "";
       setSuccessMsg(`Found ${data.found || 0} new prospect${(data.found || 0) !== 1 ? "s" : ""} from ${data.searchResults || 0} search results${debugInfo}`);
@@ -102,11 +113,11 @@ export function OutreachDashboard({ onLogout }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: selectedProjectId }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       // Refresh prospects after sending emails
       const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
-      const prospectsData = await prospectsRes.json();
+      const prospectsData = await safeJson(prospectsRes);
       setProspects(prospectsData.prospects || []);
       setSuccessMsg(`Sent ${data.sent || 0} outreach email${(data.sent || 0) !== 1 ? "s" : ""}`);
       setTimeout(() => setSuccessMsg(""), 5000);
@@ -129,11 +140,11 @@ export function OutreachDashboard({ onLogout }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: selectedProjectId }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       // Refresh prospects after checking replies
       const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
-      const prospectsData = await prospectsRes.json();
+      const prospectsData = await safeJson(prospectsRes);
       setProspects(prospectsData.prospects || []);
       setSuccessMsg(`Processed ${data.processed || 0} repl${(data.processed || 0) !== 1 ? "ies" : "y"}`);
       setTimeout(() => setSuccessMsg(""), 5000);
