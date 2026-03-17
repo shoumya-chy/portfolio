@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
     }
 
     const valid = await verifyLogin(email, password);
+    console.log("[LOGIN] email:", email, "valid:", valid);
     if (!valid) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
