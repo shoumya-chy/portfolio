@@ -5,7 +5,7 @@
 set -e
 
 APP_DIR="/var/www/shoumya-portfolio"
-REPO="https://github.com/shoumya-chy/portfolio.git"
+REPO="https://github.com/shoumya-chy/shoumya-portfolio.git"
 
 echo "==> Pulling latest code..."
 if [ -d "$APP_DIR" ]; then

@@ -1,18 +1,26 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, LogOut, Loader2, Download, Trash2, AlertCircle } from "lucide-react";
+import { RefreshCw, LogOut, Loader2, Download, Trash2, AlertCircle, ChevronDown, Globe } from "lucide-react";
 import { StatsCards } from "./StatsCards";
 import { KeywordTable } from "./KeywordTable";
 import { ContentIdeasList } from "./ContentIdeas";
 import { TopicClusters } from "./TopicClusters";
 import type { KeywordData, TrendingTopic, AnalysisResult, Keyword } from "@/lib/types";
 
+interface SiteOption {
+  id: string;
+  name: string;
+  url: string;
+}
+
 interface Props {
   onLogout: () => void;
 }
 
 export function AdminDashboard({ onLogout }: Props) {
+  const [sites, setSites] = useState<SiteOption[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("");
   const [gsc, setGsc] = useState<KeywordData | null>(null);
   const [bing, setBing] = useState<KeywordData | null>(null);
   const [reddit, setReddit] = useState<TrendingTopic[]>([]);
@@ -20,18 +28,31 @@ export function AdminDashboard({ onLogout }: Props) {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Fetch sites list on mount
+  useEffect(() => {
+    fetch("/api/admin/sites")
+      .then((r) => r.json())
+      .then((d) => {
+        const list: SiteOption[] = d.sites || [];
+        setSites(list);
+        if (list.length > 0) setSelectedSite(list[0].url);
+      })
+      .catch(() => setSites([]));
+  }, []);
+
   const setLoadingKey = (key: string, val: boolean) =>
     setLoading((p) => ({ ...p, [key]: val }));
   const setErrorKey = (key: string, val: string) =>
     setErrors((p) => ({ ...p, [key]: val }));
 
-  const fetchData = useCallback(async (endpoint: string, key: string) => {
+  const fetchData = useCallback(async (endpoint: string, key: string, siteUrl: string) => {
     setLoadingKey(key, true);
     setErrorKey(key, "");
     try {
       const res = await fetch(`/api/tools/content-ideas/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl }),
       });
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const json = await res.json();
@@ -45,20 +66,26 @@ export function AdminDashboard({ onLogout }: Props) {
     }
   }, []);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (siteUrl: string) => {
+    if (!siteUrl) return;
     const [gscData, bingData, redditData] = await Promise.all([
-      fetchData("gsc", "gsc"),
-      fetchData("bing", "bing"),
-      fetchData("reddit", "reddit"),
+      fetchData("gsc", "gsc", siteUrl),
+      fetchData("bing", "bing", siteUrl),
+      fetchData("reddit", "reddit", siteUrl),
     ]);
     if (gscData) setGsc(gscData);
+    else setGsc(null);
     if (bingData) setBing(bingData);
+    else setBing(null);
     if (redditData) setReddit(redditData);
+    else setReddit([]);
+    setAnalysis(null);
   }, [fetchData]);
 
+  // Reload data when selected site changes
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    if (selectedSite) loadAll(selectedSite);
+  }, [selectedSite, loadAll]);
 
   const allKeywords: Keyword[] = [
     ...(gsc?.keywords || []),
@@ -66,14 +93,14 @@ export function AdminDashboard({ onLogout }: Props) {
   ];
 
   const runAnalysis = async () => {
-    if (!allKeywords.length) return;
+    if (!allKeywords.length || !selectedSite) return;
     setLoadingKey("analysis", true);
     setErrorKey("analysis", "");
     try {
       const res = await fetch("/api/tools/content-ideas/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keywords: allKeywords, trendingTopics: reddit }),
+        body: JSON.stringify({ keywords: allKeywords, trendingTopics: reddit, siteUrl: selectedSite }),
       });
       if (!res.ok) throw new Error(`Analysis failed (${res.status})`);
       const json = await res.json();
@@ -101,15 +128,53 @@ export function AdminDashboard({ onLogout }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `keywords-${new Date().toISOString().split("T")[0]}.csv`;
+    const siteName = sites.find((s) => s.url === selectedSite)?.name || "all";
+    a.download = `keywords-${siteName.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSiteChange = (url: string) => {
+    setSelectedSite(url);
+    setGsc(null);
+    setBing(null);
+    setReddit([]);
+    setAnalysis(null);
+    setErrors({});
   };
 
   const isAnyLoading = Object.values(loading).some(Boolean);
 
   return (
     <div className="space-y-6">
+      {/* Site Selector */}
+      {sites.length > 0 && (
+        <div className="flex items-center gap-3 p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
+          <Globe size={18} className="text-[var(--color-accent)] shrink-0" />
+          <span className="text-sm font-medium text-[var(--color-text-dim)] shrink-0">Site:</span>
+          <div className="relative">
+            <select
+              value={selectedSite}
+              onChange={(e) => handleSiteChange(e.target.value)}
+              className="appearance-none bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-3 py-1.5 pr-8 text-sm text-[var(--color-text)] cursor-pointer hover:border-[var(--color-border-hover)] transition-colors focus:outline-none focus:border-[var(--color-accent)]"
+            >
+              {sites.map((s) => (
+                <option key={s.id} value={s.url}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-dim)]" />
+          </div>
+        </div>
+      )}
+
+      {sites.length === 0 && (
+        <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm text-[var(--color-text-muted)]">
+          No sites configured yet. Go to <a href="/admin/settings" className="text-[var(--color-accent)] hover:underline">Settings</a> to add your first site.
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -119,8 +184,8 @@ export function AdminDashboard({ onLogout }: Props) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={loadAll}
-            disabled={isAnyLoading}
+            onClick={() => loadAll(selectedSite)}
+            disabled={isAnyLoading || !selectedSite}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-card)] disabled:opacity-50 transition-colors"
           >
             <RefreshCw size={14} className={isAnyLoading ? "animate-spin" : ""} />

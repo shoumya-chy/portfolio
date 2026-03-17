@@ -9,20 +9,21 @@ export async function POST(req: Request) {
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const cached = getCache<AnalysisResult>("analysis");
-    if (cached) return NextResponse.json({ data: cached, fromCache: true });
-
-    const { keywords, trendingTopics } = (await req.json()) as {
+    const { keywords, trendingTopics, siteUrl } = (await req.json()) as {
       keywords: Keyword[];
       trendingTopics: TrendingTopic[];
+      siteUrl?: string;
     };
 
     if (!keywords?.length) {
       return NextResponse.json({ error: "No keywords provided" }, { status: 400 });
     }
 
+    const cached = getCache<AnalysisResult>("analysis", siteUrl);
+    if (cached) return NextResponse.json({ data: cached, fromCache: true });
+
     const data = await analyzeContentIdeas(keywords, trendingTopics || []);
-    setCache("analysis", data);
+    setCache("analysis", data, siteUrl);
     return NextResponse.json({ data, fromCache: false });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Analysis failed";

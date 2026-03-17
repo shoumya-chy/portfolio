@@ -1,9 +1,10 @@
 import type { KeywordData, Keyword } from "@/lib/types";
+import { getApiKey } from "@/lib/config";
 
-export async function fetchBingData(): Promise<KeywordData> {
-  const apiKey = process.env.BING_API_KEY;
-  const siteUrl = process.env.BING_SITE_URL || process.env.GSC_SITE_URL;
-  if (!apiKey || !siteUrl) throw new Error("Bing credentials not configured");
+export async function fetchBingData(siteUrl: string): Promise<KeywordData> {
+  const apiKey = getApiKey("bing");
+  if (!apiKey) throw new Error("Bing API key not configured. Add it in Settings.");
+  if (!siteUrl) throw new Error("Site URL is required");
 
   const endDate = new Date().toISOString().split("T")[0];
   const startDate = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
@@ -48,11 +49,5 @@ export async function fetchBingData(): Promise<KeywordData> {
   const totalClicks = keywords.reduce((s, k) => s + k.clicks, 0);
   const avgPosition = keywords.length ? Math.round((keywords.reduce((s, k) => s + k.position, 0) / keywords.length) * 10) / 10 : 0;
 
-  return {
-    keywords,
-    totalImpressions,
-    totalClicks,
-    avgPosition,
-    fetchedAt: new Date().toISOString(),
-  };
+  return { keywords, totalImpressions, totalClicks, avgPosition, fetchedAt: new Date().toISOString() };
 }

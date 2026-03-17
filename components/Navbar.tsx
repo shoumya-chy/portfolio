@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Settings } from "lucide-react";
 
 const navLinks = [
   { label: "About", href: "#about" },
@@ -17,11 +17,19 @@ const navLinks = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/verify")
+      .then((r) => r.json())
+      .then((d) => setIsAdmin(d.isAdmin))
+      .catch(() => setIsAdmin(false));
   }, []);
 
   return (
@@ -52,6 +60,17 @@ export function Navbar() {
               </Link>
             </li>
           ))}
+          {isAdmin && (
+            <li>
+              <Link
+                href="/admin/settings"
+                className="px-3 py-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors rounded-lg hover:bg-[var(--color-bg-card)] flex items-center gap-1"
+              >
+                <Settings size={14} />
+                Settings
+              </Link>
+            </li>
+          )}
           <li className="ml-2">
             <a
               href="/Shoumya_Chowdhury_Resume.pdf"
@@ -89,6 +108,18 @@ export function Navbar() {
                 </Link>
               </li>
             ))}
+            {isAdmin && (
+              <li>
+                <Link
+                  href="/admin/settings"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-1 px-3 py-2.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-card)] rounded-lg transition-colors"
+                >
+                  <Settings size={14} />
+                  Settings
+                </Link>
+              </li>
+            )}
           </ul>
         </div>
       )}

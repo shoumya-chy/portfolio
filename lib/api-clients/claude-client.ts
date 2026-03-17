@@ -1,12 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Keyword, TrendingTopic, AnalysisResult } from "@/lib/types";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { getApiKey } from "@/lib/config";
 
 export async function analyzeContentIdeas(
   keywords: Keyword[],
   trendingTopics: TrendingTopic[]
 ): Promise<AnalysisResult> {
+  const apiKey = getApiKey("anthropic");
+  if (!apiKey) throw new Error("Anthropic API key not configured. Add it in Settings.");
+
+  const client = new Anthropic({ apiKey });
+
   const topKeywords = keywords
     .sort((a, b) => b.impressions - a.impressions)
     .slice(0, 100)
@@ -69,12 +73,8 @@ Generate 8-12 content ideas, 4-6 topic clusters, and 3-5 content gaps. Focus on 
 
   try {
     const result = JSON.parse(text);
-    return {
-      ...result,
-      analyzedAt: new Date().toISOString(),
-    };
+    return { ...result, analyzedAt: new Date().toISOString() };
   } catch {
-    // Try extracting JSON from possible markdown wrapper
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);

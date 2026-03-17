@@ -1,0 +1,14 @@
+{
+  "admin": {
+    "email": "shoumyachowdhury@gmail.com",
+    "passwordHash": ""
+  },
+  "apiKeys": {
+    "anthropic": "",
+    "bing": ""
+  },
+  "gsc": {
+    "credentialsJson": ""
+  },
+  "sites": []
+}

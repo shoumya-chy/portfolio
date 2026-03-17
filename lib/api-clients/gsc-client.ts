@@ -1,15 +1,13 @@
 import type { KeywordData, Keyword } from "@/lib/types";
-
-const GSC_API_BASE = "https://searchconsole.googleapis.com/webmasters/v3";
+import { getGscCredentials } from "@/lib/config";
 
 async function getAccessToken(): Promise<string> {
-  const credJson = process.env.GSC_CREDENTIALS_JSON;
-  if (!credJson) throw new Error("GSC_CREDENTIALS_JSON not configured");
+  const credJson = getGscCredentials();
+  if (!credJson) throw new Error("GSC credentials not configured. Add them in Settings.");
 
   const creds = JSON.parse(Buffer.from(credJson, "base64").toString("utf-8"));
   const now = Math.floor(Date.now() / 1000);
 
-  // Build JWT for service account
   const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(
     JSON.stringify({
@@ -39,9 +37,8 @@ async function getAccessToken(): Promise<string> {
   return tokenData.access_token;
 }
 
-export async function fetchGSCData(): Promise<KeywordData> {
-  const siteUrl = process.env.GSC_SITE_URL;
-  if (!siteUrl) throw new Error("GSC_SITE_URL not configured");
+export async function fetchGSCData(siteUrl: string): Promise<KeywordData> {
+  if (!siteUrl) throw new Error("Site URL is required");
 
   const accessToken = await getAccessToken();
   const endDate = new Date().toISOString().split("T")[0];
@@ -86,11 +83,5 @@ export async function fetchGSCData(): Promise<KeywordData> {
   const totalClicks = keywords.reduce((s, k) => s + k.clicks, 0);
   const avgPosition = keywords.length ? Math.round((keywords.reduce((s, k) => s + k.position, 0) / keywords.length) * 10) / 10 : 0;
 
-  return {
-    keywords,
-    totalImpressions,
-    totalClicks,
-    avgPosition,
-    fetchedAt: new Date().toISOString(),
-  };
+  return { keywords, totalImpressions, totalClicks, avgPosition, fetchedAt: new Date().toISOString() };
 }

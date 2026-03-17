@@ -1,16 +1,19 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { getAdminEmail, getAdminPasswordHash } from "./config";
 import type { AuthPayload } from "./types";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || "";
 const COOKIE_NAME = "sc_auth";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-export async function verifyPassword(password: string): Promise<boolean> {
-  if (!ADMIN_PASSWORD_HASH) return false;
-  return bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+export async function verifyLogin(email: string, password: string): Promise<boolean> {
+  const adminEmail = getAdminEmail();
+  const passwordHash = getAdminPasswordHash();
+  if (!adminEmail || !passwordHash) return false;
+  if (email.toLowerCase() !== adminEmail.toLowerCase()) return false;
+  return bcrypt.compare(password, passwordHash);
 }
 
 export function generateToken(): string {

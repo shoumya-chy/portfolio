@@ -5,16 +5,24 @@ interface CacheEntry<T> {
 
 const store = new Map<string, CacheEntry<unknown>>();
 
-const TTL = {
-  gsc: 24 * 60 * 60 * 1000,       // 24 hours
-  bing: 24 * 60 * 60 * 1000,      // 24 hours
-  reddit: 12 * 60 * 60 * 1000,    // 12 hours
-  analysis: 7 * 24 * 60 * 60 * 1000, // 7 days
+const TTL: Record<string, number> = {
+  gsc: 24 * 60 * 60 * 1000,
+  bing: 24 * 60 * 60 * 1000,
+  reddit: 12 * 60 * 60 * 1000,
+  analysis: 7 * 24 * 60 * 60 * 1000,
 };
 
-export type CacheKey = keyof typeof TTL;
+// Site-scoped cache key: "gsc:https://knowworldnow.com"
+function buildKey(type: string, siteUrl?: string): string {
+  return siteUrl ? `${type}:${siteUrl}` : type;
+}
 
-export function getCache<T>(key: CacheKey): T | null {
+function getTTL(type: string): number {
+  return TTL[type] || 24 * 60 * 60 * 1000;
+}
+
+export function getCache<T>(type: string, siteUrl?: string): T | null {
+  const key = buildKey(type, siteUrl);
   const entry = store.get(key) as CacheEntry<T> | undefined;
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
@@ -24,15 +32,17 @@ export function getCache<T>(key: CacheKey): T | null {
   return entry.data;
 }
 
-export function setCache<T>(key: CacheKey, data: T): void {
+export function setCache<T>(type: string, data: T, siteUrl?: string): void {
+  const key = buildKey(type, siteUrl);
   store.set(key, {
     data,
-    expiresAt: Date.now() + TTL[key],
+    expiresAt: Date.now() + getTTL(type),
   });
 }
 
-export function clearCache(key?: CacheKey): void {
-  if (key) {
+export function clearCache(type?: string, siteUrl?: string): void {
+  if (type) {
+    const key = buildKey(type, siteUrl);
     store.delete(key);
   } else {
     store.clear();
@@ -41,12 +51,11 @@ export function clearCache(key?: CacheKey): void {
 
 export function getCacheStatus(): Record<string, { cached: boolean; expiresAt: string | null }> {
   const status: Record<string, { cached: boolean; expiresAt: string | null }> = {};
-  for (const key of Object.keys(TTL) as CacheKey[]) {
-    const entry = store.get(key);
-    const isValid = entry && Date.now() < entry.expiresAt;
+  for (const [key, entry] of store.entries()) {
+    const isValid = Date.now() < entry.expiresAt;
     status[key] = {
-      cached: !!isValid,
-      expiresAt: isValid ? new Date(entry!.expiresAt).toISOString() : null,
+      cached: isValid,
+      expiresAt: isValid ? new Date(entry.expiresAt).toISOString() : null,
     };
   }
   return status;
