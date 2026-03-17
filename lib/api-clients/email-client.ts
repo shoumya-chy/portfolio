@@ -11,13 +11,21 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail(config: SmtpConfig, from: string, options: SendEmailOptions): Promise<string> {
+  // Port 587 = STARTTLS (secure: false, upgrades via STARTTLS)
+  // Port 465 = direct SSL (secure: true)
+  const useDirectSSL = config.port === 465 || config.secure;
+
   const transporter = nodemailer.createTransport({
     host: config.host,
     port: config.port,
-    secure: config.secure,
+    secure: useDirectSSL,
     auth: {
       user: config.username,
       pass: config.password,
+    },
+    // For STARTTLS on port 587, nodemailer auto-upgrades when secure=false
+    tls: {
+      rejectUnauthorized: true,
     },
   });
 
@@ -80,7 +88,7 @@ export async function fetchInboxEmails(config: ImapConfig, since: Date): Promise
           const fromAddr = env.from?.[0]?.address || "";
           const text = fetchMsg.source ? fetchMsg.source.toString("utf-8") : "";
 
-          // Extract plain text body (simple extraction)
+          // Extract plain text body
           let body = text;
           const textMatch = text.match(/Content-Type: text\/plain[\s\S]*?\r\n\r\n([\s\S]*?)(?:\r\n--|\r\n\r\n)/);
           if (textMatch) body = textMatch[1];

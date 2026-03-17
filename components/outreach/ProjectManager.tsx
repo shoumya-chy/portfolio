@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { X, Loader2, AlertCircle } from "lucide-react";
-import type { OutreachProject } from "@/lib/outreach/types";
 
 interface Props {
   onClose: () => void;
@@ -39,14 +38,14 @@ export function ProjectManager({ onClose, onCreated }: Props) {
     domainFilters: "",
     emailsPerWeek: 20,
     smtp: {
-      host: "",
-      port: 465,
-      secure: true,
+      host: "smtp.hostinger.com",
+      port: 587,
+      secure: false,
       username: "",
       password: "",
     },
     imap: {
-      host: "",
+      host: "imap.hostinger.com",
       port: 993,
       secure: true,
       username: "",
@@ -56,6 +55,16 @@ export function ProjectManager({ onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Auto-fill SMTP/IMAP username when email changes
+  const handleEmailChange = (email: string) => {
+    setFormData({
+      ...formData,
+      emailAddress: email,
+      smtp: { ...formData.smtp, username: email },
+      imap: { ...formData.imap, username: email },
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -64,7 +73,7 @@ export function ProjectManager({ onClose, onCreated }: Props) {
     try {
       const payload = {
         name: formData.name,
-        niche: formData.niche,
+        niche: formData.niche || "",
         emailAddress: formData.emailAddress,
         domainFilters: formData.domainFilters.split(",").map((f) => f.trim()).filter(Boolean),
         emailsPerWeek: formData.emailsPerWeek,
@@ -89,6 +98,8 @@ export function ProjectManager({ onClose, onCreated }: Props) {
       setLoading(false);
     }
   };
+
+  const inputClass = "w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]";
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -121,25 +132,29 @@ export function ProjectManager({ onClose, onCreated }: Props) {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
-                className="px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+                className={inputClass}
               />
-              <input
-                type="text"
-                placeholder="Niche (e.g., SaaS, Tech)"
-                value={formData.niche}
-                onChange={(e) => setFormData({ ...formData, niche: e.target.value })}
-                required
-                className="px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-              />
+              <div>
+                <input
+                  type="text"
+                  placeholder="Niche (leave empty for multi-niche)"
+                  value={formData.niche}
+                  onChange={(e) => setFormData({ ...formData, niche: e.target.value })}
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-[var(--color-text-dim)]">
+                  Empty = multi-niche (searches across all topics)
+                </p>
+              </div>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <input
                 type="email"
-                placeholder="Email address"
+                placeholder="Email address (e.g., outreach@yourdomain.com)"
                 value={formData.emailAddress}
-                onChange={(e) => setFormData({ ...formData, emailAddress: e.target.value })}
+                onChange={(e) => handleEmailChange(e.target.value)}
                 required
-                className="px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+                className={inputClass}
               />
               <input
                 type="number"
@@ -147,7 +162,7 @@ export function ProjectManager({ onClose, onCreated }: Props) {
                 value={formData.emailsPerWeek}
                 onChange={(e) => setFormData({ ...formData, emailsPerWeek: parseInt(e.target.value) || 20 })}
                 min="1"
-                className="px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+                className={inputClass}
               />
             </div>
             <input
@@ -155,104 +170,121 @@ export function ProjectManager({ onClose, onCreated }: Props) {
               placeholder="Domain filters (comma-separated, e.g. .com, .org, .io)"
               value={formData.domainFilters}
               onChange={(e) => setFormData({ ...formData, domainFilters: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+              className={inputClass}
             />
           </div>
 
           {/* SMTP Configuration */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-[var(--color-text-dim)]">SMTP Configuration</h3>
-            <input
-              type="text"
-              placeholder="SMTP Host (e.g., smtp.gmail.com)"
-              value={formData.smtp.host}
-              onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, host: e.target.value } })}
-              required
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--color-text-dim)]">SMTP Configuration (Sending)</h3>
+              <span className="text-xs text-[var(--color-text-dim)]">Pre-filled for Hostinger</span>
+            </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <input
-                type="number"
-                placeholder="Port"
-                value={formData.smtp.port}
-                onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, port: parseInt(e.target.value) || 465 } })}
-                min="1"
-                className="px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+                type="text"
+                placeholder="SMTP Host"
+                value={formData.smtp.host}
+                onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, host: e.target.value } })}
+                required
+                className={inputClass}
               />
-              <label className="flex items-center gap-2 px-3 py-2">
+              <div className="grid grid-cols-2 gap-2">
                 <input
-                  type="checkbox"
-                  checked={formData.smtp.secure}
-                  onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, secure: e.target.checked } })}
-                  className="w-4 h-4"
+                  type="number"
+                  placeholder="Port"
+                  value={formData.smtp.port}
+                  onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, port: parseInt(e.target.value) || 587 } })}
+                  min="1"
+                  className={inputClass}
                 />
-                <span className="text-sm text-[var(--color-text)]">Use TLS/SSL</span>
-              </label>
+                <label className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text)]">
+                  <input
+                    type="checkbox"
+                    checked={formData.smtp.secure}
+                    onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, secure: e.target.checked } })}
+                    className="w-4 h-4"
+                  />
+                  SSL/TLS
+                </label>
+              </div>
             </div>
-            <input
-              type="text"
-              placeholder="SMTP Username"
-              value={formData.smtp.username}
-              onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, username: e.target.value } })}
-              required
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
-            <input
-              type="password"
-              placeholder="SMTP Password"
-              value={formData.smtp.password}
-              onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, password: e.target.value } })}
-              required
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
+            <p className="text-xs text-[var(--color-text-dim)]">
+              Port 587 uses STARTTLS (recommended for Hostinger). Port 465 uses direct SSL.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="SMTP Username (your email)"
+                value={formData.smtp.username}
+                onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, username: e.target.value } })}
+                required
+                className={inputClass}
+              />
+              <input
+                type="password"
+                placeholder="SMTP Password"
+                value={formData.smtp.password}
+                onChange={(e) => setFormData({ ...formData, smtp: { ...formData.smtp, password: e.target.value } })}
+                required
+                className={inputClass}
+              />
+            </div>
           </div>
 
           {/* IMAP Configuration */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-[var(--color-text-dim)]">IMAP Configuration</h3>
-            <input
-              type="text"
-              placeholder="IMAP Host (e.g., imap.gmail.com)"
-              value={formData.imap.host}
-              onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, host: e.target.value } })}
-              required
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--color-text-dim)]">IMAP Configuration (Receiving)</h3>
+              <span className="text-xs text-[var(--color-text-dim)]">Pre-filled for Hostinger</span>
+            </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <input
-                type="number"
-                placeholder="Port"
-                value={formData.imap.port}
-                onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, port: parseInt(e.target.value) || 993 } })}
-                min="1"
-                className="px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+                type="text"
+                placeholder="IMAP Host"
+                value={formData.imap.host}
+                onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, host: e.target.value } })}
+                required
+                className={inputClass}
               />
-              <label className="flex items-center gap-2 px-3 py-2">
+              <div className="grid grid-cols-2 gap-2">
                 <input
-                  type="checkbox"
-                  checked={formData.imap.secure}
-                  onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, secure: e.target.checked } })}
-                  className="w-4 h-4"
+                  type="number"
+                  placeholder="Port"
+                  value={formData.imap.port}
+                  onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, port: parseInt(e.target.value) || 993 } })}
+                  min="1"
+                  className={inputClass}
                 />
-                <span className="text-sm text-[var(--color-text)]">Use TLS/SSL</span>
-              </label>
+                <label className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text)]">
+                  <input
+                    type="checkbox"
+                    checked={formData.imap.secure}
+                    onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, secure: e.target.checked } })}
+                    className="w-4 h-4"
+                  />
+                  SSL/TLS
+                </label>
+              </div>
             </div>
-            <input
-              type="text"
-              placeholder="IMAP Username"
-              value={formData.imap.username}
-              onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, username: e.target.value } })}
-              required
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
-            <input
-              type="password"
-              placeholder="IMAP Password"
-              value={formData.imap.password}
-              onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, password: e.target.value } })}
-              required
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="IMAP Username (your email)"
+                value={formData.imap.username}
+                onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, username: e.target.value } })}
+                required
+                className={inputClass}
+              />
+              <input
+                type="password"
+                placeholder="IMAP Password"
+                value={formData.imap.password}
+                onChange={(e) => setFormData({ ...formData, imap: { ...formData.imap, password: e.target.value } })}
+                required
+                className={inputClass}
+              />
+            </div>
           </div>
 
           {/* Actions */}

@@ -12,11 +12,13 @@ export async function searchWriteForUs(
   engineId: string,
   startIndex: number = 1
 ): Promise<SearchResult[]> {
+  // If niche is empty, the site is multi-niche — search broadly
+  const nichePrefix = niche ? `"${niche}" ` : "";
   const queries = [
-    `"${niche}" "write for us"`,
-    `"${niche}" "guest post"`,
-    `"${niche}" "contribute"`,
-    `"${niche}" "submit a guest post"`,
+    `${nichePrefix}"write for us"`,
+    `${nichePrefix}"guest post"`,
+    `${nichePrefix}"contribute"`,
+    `${nichePrefix}"submit a guest post"`,
   ];
 
   const results: SearchResult[] = [];

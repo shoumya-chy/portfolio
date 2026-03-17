@@ -24,7 +24,8 @@ export async function generateGuestPost(
     `Backlink ${i + 1}: Link to "${bl.url}" with natural anchor text related to the page topic`
   ).join("\n");
 
-  const prompt = `You are a seasoned freelance writer who writes for real blogs and publications. You've been hired to write a guest post for "${targetDomain}" in the ${niche} niche. You are a real human being — you write from personal experience, real-world observations, and your own unique perspective.
+  const nicheContext = niche ? `in the ${niche} niche` : "(multi-niche site — match the target site's topic area)";
+  const prompt = `You are a seasoned freelance writer who writes for real blogs and publications. You've been hired to write a guest post for "${targetDomain}" ${nicheContext}. You are a real human being — you write from personal experience, real-world observations, and your own unique perspective.
 
 ## CRITICAL WRITING RULES — READ CAREFULLY:
 
