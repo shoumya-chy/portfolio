@@ -80,8 +80,9 @@ export function OutreachDashboard({ onLogout }: Props) {
       const statsRes = await fetch(`/api/tools/guest-post-outreach/stats?projectId=${selectedProjectId}`);
       const statsData = await statsRes.json();
       setStats(statsData.stats || null);
-      setSuccessMsg(`Found ${data.found || 0} new prospect${(data.found || 0) !== 1 ? "s" : ""}`);
-      setTimeout(() => setSuccessMsg(""), 5000);
+      const debugInfo = data.debug ? ` (${data.debug.join(" → ")})` : "";
+      setSuccessMsg(`Found ${data.found || 0} new prospect${(data.found || 0) !== 1 ? "s" : ""} from ${data.searchResults || 0} search results${debugInfo}`);
+      setTimeout(() => setSuccessMsg(""), 15000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to find sites";
       setErrorKey("findSites", msg);

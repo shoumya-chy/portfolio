@@ -31,8 +31,10 @@ export async function POST(request: Request) {
     const result = await findNewProspects(project);
 
     return NextResponse.json({
-      found: result.length,
-      prospects: result,
+      found: result.prospects.length,
+      searchResults: result.searchResultCount,
+      prospects: result.prospects,
+      debug: result.debug,
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";

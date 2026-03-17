@@ -2,7 +2,7 @@ import { searchWriteForUs } from "@/lib/api-clients/google-search-client";
 import { extractContactEmail } from "@/lib/api-clients/content-scraper";
 import { listProspects, saveProspectsBatch } from "@/lib/outreach/storage";
 import type { OutreachProject, OutreachProspect } from "@/lib/outreach/types";
-import { getApiKey, getGoogleCSEId, getGoogleCSEApiKey } from "@/lib/config";
+import { getGoogleCSEId, getGoogleCSEApiKey } from "@/lib/config";
 
 function generateProspectId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
@@ -21,47 +21,35 @@ async function safeExtractEmail(url: string): Promise<string | null> {
 
 /**
  * Finds new "write for us" prospects.
- * Uses Bing Web Search API (primary) or Google CSE (fallback).
+ * Uses DuckDuckGo scraping (no API key needed) as primary.
+ * Falls back to Google CSE if configured.
  */
 export async function findNewProspects(
   project: OutreachProject
-): Promise<OutreachProspect[]> {
-  // Try Bing first (searches the entire web), then fall back to Google CSE
-  const bingKey = getApiKey("bing");
+): Promise<{ prospects: OutreachProspect[]; searchResultCount: number; debug: string[] }> {
   const cseId = getGoogleCSEId();
   const cseApiKey = getGoogleCSEApiKey();
+  const debug: string[] = [];
 
-  let searchResults;
+  debug.push(`Niche: "${project.niche || "(multi-niche)"}"`);
+  debug.push(`Domain filters: ${project.domainFilters.length > 0 ? project.domainFilters.join(", ") : "(none)"}`);
 
-  if (bingKey) {
-    console.log(`[ProspectFinder] Using Bing Web Search API`);
-    console.log(`[ProspectFinder] Project niche: "${project.niche}", domain filters: ${JSON.stringify(project.domainFilters)}`);
-    searchResults = await searchWriteForUs(
-      project.niche,
-      project.domainFilters,
-      bingKey,
-      "bing"
-    );
-  } else if (cseId && cseApiKey) {
-    console.log(`[ProspectFinder] Using Google CSE (Bing key not configured)`);
-    console.log(`[ProspectFinder] Project niche: "${project.niche}", domain filters: ${JSON.stringify(project.domainFilters)}`);
-    searchResults = await searchWriteForUs(
-      project.niche,
-      project.domainFilters,
-      cseApiKey,
-      "google",
-      cseId
-    );
+  if (cseId && cseApiKey) {
+    debug.push("Google CSE configured — will try first, then DuckDuckGo");
   } else {
-    throw new Error(
-      "No search API configured. Add your Bing API key in Settings, or configure Google CSE ID and API Key under Guest Post Outreach."
-    );
+    debug.push("No Google CSE — using DuckDuckGo scraping");
   }
 
-  console.log(`[ProspectFinder] Search returned ${searchResults.length} results`);
+  const searchResults = await searchWriteForUs(
+    project.niche,
+    project.domainFilters,
+    cseId && cseApiKey ? { googleApiKey: cseApiKey, googleEngineId: cseId } : undefined
+  );
+
+  debug.push(`Search returned ${searchResults.length} unique sites`);
 
   if (searchResults.length === 0) {
-    return [];
+    return { prospects: [], searchResultCount: 0, debug };
   }
 
   // Get existing prospects for dedup
@@ -104,11 +92,15 @@ export async function findNewProspects(
     existingDomains.add(result.domain);
   }
 
-  console.log(`[ProspectFinder] Results: ${newProspects.length} new, ${skippedDuplicate} duplicates, ${emailFound} with email, ${emailNotFound} without email`);
+  debug.push(`${skippedDuplicate} duplicates skipped`);
+  debug.push(`${emailFound} with email, ${emailNotFound} without email`);
+  debug.push(`${newProspects.length} new prospects saved`);
+
+  console.log(`[ProspectFinder] ${debug.join(" | ")}`);
 
   if (newProspects.length > 0) {
     saveProspectsBatch(project.id, newProspects);
   }
 
-  return newProspects;
+  return { prospects: newProspects, searchResultCount: searchResults.length, debug };
 }

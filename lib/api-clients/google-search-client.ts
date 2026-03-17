@@ -6,26 +6,37 @@ export interface SearchResult {
 }
 
 /**
- * Search for "write for us" pages using Bing Web Search API.
- * Falls back to Google CSE if Bing key is not available.
+ * Search for "write for us" pages.
+ * Uses direct web scraping (no API key needed), with Google CSE as fallback.
  */
 export async function searchWriteForUs(
   niche: string,
   domainFilters: string[],
-  apiKey: string,
-  searchEngine: "bing" | "google" = "bing",
-  engineId?: string
+  options?: { googleApiKey?: string; googleEngineId?: string }
 ): Promise<SearchResult[]> {
-  if (searchEngine === "google" && engineId) {
-    return searchWithGoogle(niche, domainFilters, apiKey, engineId);
+  // Try Google CSE first if configured
+  if (options?.googleApiKey && options?.googleEngineId) {
+    console.log("[Search] Trying Google CSE...");
+    const googleResults = await searchWithGoogle(
+      niche,
+      domainFilters,
+      options.googleApiKey,
+      options.googleEngineId
+    );
+    if (googleResults.length > 0) return googleResults;
+    console.log("[Search] Google CSE returned 0 results, falling back to DuckDuckGo scraping...");
   }
-  return searchWithBing(niche, domainFilters, apiKey);
+
+  // Fallback: scrape DuckDuckGo HTML (no API key needed)
+  return searchWithScraping(niche, domainFilters);
 }
 
-async function searchWithBing(
+/**
+ * Scrape DuckDuckGo HTML search results — no API key needed.
+ */
+async function searchWithScraping(
   niche: string,
-  domainFilters: string[],
-  apiKey: string
+  domainFilters: string[]
 ): Promise<SearchResult[]> {
   const nichePrefix = niche ? `${niche} ` : "";
   const queries = [
@@ -37,43 +48,87 @@ async function searchWithBing(
 
   const results: SearchResult[] = [];
   const seenDomains = new Set<string>();
+  const errors: string[] = [];
 
   for (const query of queries) {
     try {
-      const params = new URLSearchParams({
-        q: query,
-        count: "20",
-        responseFilter: "Webpages",
-        mkt: "en-US",
-      });
+      console.log(`[Search] DuckDuckGo scraping: ${query}`);
 
-      const url = `https://api.bing.microsoft.com/v7.0/search?${params}`;
-      console.log(`[BingSearch] Searching: ${query}`);
+      // DuckDuckGo HTML endpoint (no JS needed)
+      const params = new URLSearchParams({ q: query });
+      const url = `https://html.duckduckgo.com/html/?${params}`;
 
       const res = await fetch(url, {
         headers: {
-          "Ocp-Apim-Subscription-Key": apiKey,
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
         },
       });
 
       if (!res.ok) {
-        const errorBody = await res.text();
-        console.log(`[BingSearch] Query failed: ${res.status} - ${errorBody.substring(0, 200)}`);
+        const msg = `DuckDuckGo returned ${res.status}`;
+        console.log(`[Search] ${msg}`);
+        errors.push(msg);
         continue;
       }
 
-      const data = await res.json();
-      const pages = data.webPages?.value || [];
-      console.log(`[BingSearch] Got ${pages.length} results for: ${query}`);
+      const html = await res.text();
 
-      for (const page of pages) {
-        const itemUrl = page.url;
+      // Parse DuckDuckGo HTML results
+      // Results are in <a class="result__a" href="...">title</a>
+      // and snippets in <a class="result__snippet" ...>snippet</a>
+      const linkRegex = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+      const snippetRegex = /<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+
+      const links: { url: string; title: string }[] = [];
+      let match;
+
+      while ((match = linkRegex.exec(html)) !== null) {
+        let href = match[1];
+        const title = match[2].replace(/<[^>]+>/g, "").trim();
+
+        // DuckDuckGo wraps URLs in a redirect, extract real URL
+        if (href.includes("uddg=")) {
+          try {
+            const uddg = new URL(href, "https://duckduckgo.com").searchParams.get("uddg");
+            if (uddg) href = uddg;
+          } catch {
+            // use as-is
+          }
+        }
+
+        if (href.startsWith("http")) {
+          links.push({ url: decodeURIComponent(href), title });
+        }
+      }
+
+      // Extract snippets
+      const snippets: string[] = [];
+      while ((match = snippetRegex.exec(html)) !== null) {
+        snippets.push(match[1].replace(/<[^>]+>/g, "").trim());
+      }
+
+      console.log(`[Search] Got ${links.length} results for: ${query}`);
+
+      for (let i = 0; i < links.length; i++) {
+        const link = links[i];
         let domain: string;
         try {
-          domain = new URL(itemUrl).hostname.replace("www.", "");
+          domain = new URL(link.url).hostname.replace("www.", "");
         } catch {
           continue;
         }
+
+        // Skip search engines, social media, and non-useful domains
+        const skipDomains = [
+          "duckduckgo.com", "google.com", "bing.com", "yahoo.com",
+          "facebook.com", "twitter.com", "x.com", "linkedin.com",
+          "youtube.com", "reddit.com", "quora.com", "pinterest.com",
+          "wikipedia.org", "amazon.com",
+        ];
+        if (skipDomains.some((sd) => domain.includes(sd))) continue;
 
         // Check domain extension filter
         if (domainFilters.length > 0) {
@@ -88,18 +143,27 @@ async function searchWithBing(
         seenDomains.add(domain);
 
         results.push({
-          url: itemUrl,
-          title: page.name || "",
-          snippet: page.snippet || "",
+          url: link.url,
+          title: link.title,
+          snippet: snippets[i] || "",
           domain,
         });
       }
+
+      // Small delay between queries to be polite
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     } catch (err) {
-      console.log(`[BingSearch] Error:`, err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(`[Search] Error:`, msg);
+      errors.push(msg);
     }
   }
 
-  console.log(`[BingSearch] Total unique results: ${results.length}`);
+  if (results.length === 0 && errors.length > 0) {
+    console.log(`[Search] All queries failed. Errors: ${errors.join("; ")}`);
+  }
+
+  console.log(`[Search] Total unique results: ${results.length}`);
   return results;
 }
 

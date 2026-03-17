@@ -30,8 +30,8 @@ export async function GET(request: Request) {
     for (const project of activeProjects) {
       try {
         // 1. Find new prospects
-        const newProspects = await findNewProspects(project);
-        summary.sitesFound += newProspects.length;
+        const findResult = await findNewProspects(project);
+        summary.sitesFound += findResult.prospects.length;
 
         // 2. Send outreach batch
         const emailResult = await sendOutreachBatch(project);
