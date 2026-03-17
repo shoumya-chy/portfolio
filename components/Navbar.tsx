@@ -64,9 +64,9 @@ export function Navbar() {
             <Image
               src="/logo.webp"
               alt="Shoumya Chowdhury"
-              width={48}
-              height={48}
-              className="rounded-full w-10 h-10 sm:w-12 sm:h-12"
+              width={120}
+              height={120}
+              className="rounded-full w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]"
               priority
             />
           </Link>

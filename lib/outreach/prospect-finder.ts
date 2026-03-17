@@ -2,7 +2,7 @@ import { searchWriteForUs } from "@/lib/api-clients/google-search-client";
 import { extractContactEmail } from "@/lib/api-clients/content-scraper";
 import { listProspects, saveProspectsBatch } from "@/lib/outreach/storage";
 import type { OutreachProject, OutreachProspect } from "@/lib/outreach/types";
-import { getGoogleCSEId, getGoogleCSEApiKey } from "@/lib/config";
+import { getApiKey, getGoogleCSEId, getGoogleCSEApiKey } from "@/lib/config";
 
 function generateProspectId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
@@ -20,35 +20,47 @@ async function safeExtractEmail(url: string): Promise<string | null> {
 }
 
 /**
- * Finds new "write for us" prospects via Google Custom Search
+ * Finds new "write for us" prospects.
+ * Uses Bing Web Search API (primary) or Google CSE (fallback).
  */
 export async function findNewProspects(
   project: OutreachProject
 ): Promise<OutreachProspect[]> {
+  // Try Bing first (searches the entire web), then fall back to Google CSE
+  const bingKey = getApiKey("bing");
   const cseId = getGoogleCSEId();
   const cseApiKey = getGoogleCSEApiKey();
 
-  console.log(`[ProspectFinder] CSE ID: ${cseId ? "set" : "MISSING"}, API Key: ${cseApiKey ? "set" : "MISSING"}`);
-  console.log(`[ProspectFinder] Project niche: "${project.niche}", domain filters: ${JSON.stringify(project.domainFilters)}`);
+  let searchResults;
 
-  if (!cseId || !cseApiKey) {
+  if (bingKey) {
+    console.log(`[ProspectFinder] Using Bing Web Search API`);
+    console.log(`[ProspectFinder] Project niche: "${project.niche}", domain filters: ${JSON.stringify(project.domainFilters)}`);
+    searchResults = await searchWriteForUs(
+      project.niche,
+      project.domainFilters,
+      bingKey,
+      "bing"
+    );
+  } else if (cseId && cseApiKey) {
+    console.log(`[ProspectFinder] Using Google CSE (Bing key not configured)`);
+    console.log(`[ProspectFinder] Project niche: "${project.niche}", domain filters: ${JSON.stringify(project.domainFilters)}`);
+    searchResults = await searchWriteForUs(
+      project.niche,
+      project.domainFilters,
+      cseApiKey,
+      "google",
+      cseId
+    );
+  } else {
     throw new Error(
-      "Google Custom Search configuration missing. Go to Settings and enter your CSE ID and API Key under Guest Post Outreach."
+      "No search API configured. Add your Bing API key in Settings, or configure Google CSE ID and API Key under Guest Post Outreach."
     );
   }
 
-  // searchWriteForUs(niche, domainFilters, apiKey, engineId)
-  const searchResults = await searchWriteForUs(
-    project.niche,
-    project.domainFilters,
-    cseApiKey,
-    cseId
-  );
-
-  console.log(`[ProspectFinder] Google CSE returned ${searchResults.length} results`);
+  console.log(`[ProspectFinder] Search returned ${searchResults.length} results`);
 
   if (searchResults.length === 0) {
-    console.log(`[ProspectFinder] No search results. Check if your CSE is configured to "Search the entire web" or has relevant sites added.`);
     return [];
   }
 
