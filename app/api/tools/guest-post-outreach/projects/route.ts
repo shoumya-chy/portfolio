@@ -42,9 +42,9 @@ export async function POST(request: Request) {
       emailsPerWeek,
     } = body;
 
-    if (!name || !siteId || !niche || !emailAddress) {
+    if (!name || !emailAddress) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Name and email address are required" },
         { status: 400 }
       );
     }
@@ -52,13 +52,13 @@ export async function POST(request: Request) {
     const project = {
       id: Date.now().toString(36),
       name,
-      siteId,
-      niche,
+      siteId: siteId || "",
+      niche: niche || "",
       emailAddress,
-      domainFilters,
+      domainFilters: domainFilters || [],
       smtpConfig,
       imapConfig,
-      emailsPerWeek,
+      emailsPerWeek: emailsPerWeek || 20,
       active: true,
       createdAt: new Date().toISOString(),
     };
