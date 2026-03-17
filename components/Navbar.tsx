@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Menu, X, Settings, LogIn, LogOut } from "lucide-react";
 import { LoginModal } from "@/components/content-ideas/LoginModal";
 
@@ -58,9 +59,16 @@ export function Navbar() {
         <nav className="mx-auto max-w-6xl px-4 sm:px-6 py-4 flex items-center justify-between">
           <Link
             href="/"
-            className="text-lg font-bold tracking-tight hover:text-[var(--color-accent)] transition-colors"
+            className="flex items-center hover:opacity-80 transition-opacity"
           >
-            SC<span className="text-[var(--color-accent)]">.</span>
+            <Image
+              src="/logo.webp"
+              alt="Shoumya Chowdhury"
+              width={36}
+              height={36}
+              className="rounded-full"
+              priority
+            />
           </Link>
 
           {/* Desktop */}

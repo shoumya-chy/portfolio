@@ -74,7 +74,7 @@ export function getGoogleCSEId(): string {
 
 export function getGoogleCSEApiKey(): string {
   const config = readConfig();
-  return config.outreach?.googleCSEApiKey || config.apiKeys.bing || "";
+  return config.outreach?.googleCSEApiKey || "";
 }
 
 export function getSites(): SiteConfig[] {

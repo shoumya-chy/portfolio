@@ -57,21 +57,31 @@ export function OutreachDashboard({ onLogout }: Props) {
       .finally(() => setLoadingKey("prospects", false));
   }, [selectedProjectId]);
 
+  const [successMsg, setSuccessMsg] = useState<string>("");
+
   const handleFindSites = async () => {
     if (!selectedProjectId) return;
     setLoadingKey("findSites", true);
     setErrorKey("findSites", "");
+    setSuccessMsg("");
     try {
       const res = await fetch("/api/tools/guest-post-outreach/find-sites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: selectedProjectId }),
       });
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       // Refresh prospects after finding sites
       const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
       const prospectsData = await prospectsRes.json();
       setProspects(prospectsData.prospects || []);
+      // Refresh stats
+      const statsRes = await fetch(`/api/tools/guest-post-outreach/stats?projectId=${selectedProjectId}`);
+      const statsData = await statsRes.json();
+      setStats(statsData.stats || null);
+      setSuccessMsg(`Found ${data.found || 0} new prospect${(data.found || 0) !== 1 ? "s" : ""}`);
+      setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to find sites";
       setErrorKey("findSites", msg);
@@ -84,17 +94,21 @@ export function OutreachDashboard({ onLogout }: Props) {
     if (!selectedProjectId) return;
     setLoadingKey("sendEmails", true);
     setErrorKey("sendEmails", "");
+    setSuccessMsg("");
     try {
       const res = await fetch("/api/tools/guest-post-outreach/send-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: selectedProjectId }),
       });
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       // Refresh prospects after sending emails
       const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
       const prospectsData = await prospectsRes.json();
       setProspects(prospectsData.prospects || []);
+      setSuccessMsg(`Sent ${data.sent || 0} outreach email${(data.sent || 0) !== 1 ? "s" : ""}`);
+      setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send emails";
       setErrorKey("sendEmails", msg);
@@ -107,17 +121,21 @@ export function OutreachDashboard({ onLogout }: Props) {
     if (!selectedProjectId) return;
     setLoadingKey("checkReplies", true);
     setErrorKey("checkReplies", "");
+    setSuccessMsg("");
     try {
       const res = await fetch("/api/tools/guest-post-outreach/check-replies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: selectedProjectId }),
       });
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       // Refresh prospects after checking replies
       const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
       const prospectsData = await prospectsRes.json();
       setProspects(prospectsData.prospects || []);
+      setSuccessMsg(`Processed ${data.processed || 0} repl${(data.processed || 0) !== 1 ? "ies" : "y"}`);
+      setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to check replies";
       setErrorKey("checkReplies", msg);
@@ -266,6 +284,14 @@ export function OutreachDashboard({ onLogout }: Props) {
             <span className="font-medium capitalize">{key}:</span> {msg}
           </div>
         ))}
+
+      {/* Success Message */}
+      {successMsg && (
+        <div className="flex items-center gap-2 px-4 py-3 text-sm text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg">
+          <CheckCircle2 size={16} />
+          {successMsg}
+        </div>
+      )}
 
       {/* Stats Cards */}
       {stats && selectedProjectId && (
