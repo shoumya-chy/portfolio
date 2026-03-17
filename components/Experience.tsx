@@ -3,7 +3,7 @@ const experiences = [
     role: "AI Automation Engineer",
     company: "Traffic Radius",
     location: "Melbourne, VIC",
-    period: "Dec 2025 — Present",
+    period: "Feb 2026 — Mar 2026",
     color: "var(--color-accent)",
     points: [
       "Building React/Next.js interfaces integrated with LLM and AI APIs for production-ready web features",
@@ -33,17 +33,6 @@ const experiences = [
       "Scaled platform to 50,000+ monthly visitors through strategic technical SEO and programmatic content",
       "Built full-stack WordPress and Next.js infrastructure achieving 90+ Lighthouse scores consistently",
       "Drove 300% organic traffic growth through keyword clustering, internal linking, and schema markup",
-    ],
-  },
-  {
-    role: "IT Training Coordinator",
-    company: "Dept. of Youth Development",
-    location: "Bangladesh",
-    period: "2020 — 2024",
-    color: "var(--color-orange)",
-    points: [
-      "Designed and delivered IT training programs for 50-200 participants across multiple locations",
-      "Developed curriculum covering digital literacy, productivity tools, and introductory programming",
     ],
   },
 ];

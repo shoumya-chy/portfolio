@@ -242,7 +242,10 @@ export function AdminDashboard({ onLogout }: Props) {
         }
         ideasGenerated={analysis?.ideas?.length || 0}
         dataSources={
-          (gsc ? 1 : 0) + (bing ? 1 : 0) + (reddit.length ? 1 : 0) + (analysis ? 1 : 0)
+          (gsc ? 1 : 0) + (bing ? 1 : 0) +
+          (reddit.some(t => t.source === "reddit") ? 1 : 0) +
+          (reddit.some(t => t.source === "quora") ? 1 : 0) +
+          (analysis ? 1 : 0)
         }
       />
 
@@ -263,12 +266,17 @@ export function AdminDashboard({ onLogout }: Props) {
         </div>
       )}
 
-      {/* Reddit Topics */}
+      {/* Trending Topics (Reddit + Quora) */}
       {reddit.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold mb-3">Trending Topics ({reddit.length})</h3>
+          <h3 className="text-lg font-semibold mb-3">
+            Trending Topics ({reddit.length})
+            <span className="ml-2 text-xs font-normal text-[var(--color-text-dim)]">
+              Reddit: {reddit.filter(t => t.source === "reddit").length} | Quora: {reddit.filter(t => t.source === "quora").length}
+            </span>
+          </h3>
           <div className="grid sm:grid-cols-2 gap-2">
-            {reddit.slice(0, 10).map((t, i) => (
+            {reddit.slice(0, 20).map((t, i) => (
               <a
                 key={i}
                 href={t.url}
@@ -276,8 +284,8 @@ export function AdminDashboard({ onLogout }: Props) {
                 rel="noopener noreferrer"
                 className="flex items-start gap-3 p-3 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-lg hover:border-[var(--color-border-hover)] transition-colors text-sm"
               >
-                <span className="shrink-0 text-xs font-mono text-[var(--color-orange)] mt-0.5">
-                  r/{t.subreddit}
+                <span className={`shrink-0 text-xs font-mono mt-0.5 ${t.source === "quora" ? "text-red-400" : "text-[var(--color-orange)]"}`}>
+                  {t.source === "quora" ? "Quora" : `r/${t.subreddit}`}
                 </span>
                 <span className="text-[var(--color-text-muted)] line-clamp-2">{t.title}</span>
               </a>

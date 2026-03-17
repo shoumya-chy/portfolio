@@ -1,6 +1,6 @@
 import type { TrendingTopic } from "@/lib/types";
 
-const SUBREDDITS = ["SEO", "webdev", "nextjs", "javascript", "blogging", "ContentMarketing"];
+const SUBREDDITS = ["SEO", "webdev", "nextjs", "javascript", "blogging", "ContentMarketing", "digital_marketing"];
 
 export async function fetchRedditTopics(): Promise<TrendingTopic[]> {
   const topics: TrendingTopic[] = [];
@@ -8,10 +8,16 @@ export async function fetchRedditTopics(): Promise<TrendingTopic[]> {
   for (const sub of SUBREDDITS) {
     try {
       const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=10`, {
-        headers: { "User-Agent": "ShoumyaPortfolio/1.0" },
+        headers: {
+          "User-Agent": "ShoumyaPortfolio/1.0 (content research tool)",
+          Accept: "application/json",
+        },
       });
 
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.log(`[Reddit] Failed r/${sub}: ${res.status}`);
+        continue;
+      }
       const data = await res.json();
       const posts = data?.data?.children || [];
 
@@ -27,8 +33,8 @@ export async function fetchRedditTopics(): Promise<TrendingTopic[]> {
           fetchedAt: new Date().toISOString(),
         });
       }
-    } catch {
-      // Skip failed subreddits silently
+    } catch (err) {
+      console.log(`[Reddit] Error r/${sub}:`, err instanceof Error ? err.message : err);
     }
   }
 

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Key, Shield, Save, Loader2, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Key, Shield, Save, Loader2, Eye, EyeOff, CheckCircle, Search } from "lucide-react";
 
 interface SettingsData {
   admin: { email: string; hasPassword: boolean };
   apiKeys: { anthropic: string; bing: string };
   gsc: { hasCredentials: boolean };
+  outreach?: { googleCSEId: string; googleCSEApiKey: string };
 }
 
 interface Props {
@@ -18,6 +19,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
   const [anthropicKey, setAnthropicKey] = useState("");
   const [bingKey, setBingKey] = useState("");
   const [gscJson, setGscJson] = useState("");
+  const [googleCSEId, setGoogleCSEId] = useState("");
+  const [googleCSEApiKey, setGoogleCSEApiKey] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -31,6 +34,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
       if (anthropicKey) body.anthropicKey = anthropicKey;
       if (bingKey) body.bingKey = bingKey;
       if (gscJson) body.gscCredentialsJson = btoa(gscJson);
+      if (googleCSEId) body.googleCSEId = googleCSEId;
+      if (googleCSEApiKey) body.googleCSEApiKey = googleCSEApiKey;
       if (newPassword) body.newPassword = newPassword;
 
       const res = await fetch("/api/admin/settings", {
@@ -44,6 +49,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
       setAnthropicKey("");
       setBingKey("");
       setGscJson("");
+      setGoogleCSEId("");
+      setGoogleCSEApiKey("");
       setNewPassword("");
       onSaved();
     } catch {
@@ -104,6 +111,42 @@ export function SettingsForm({ settings, onSaved }: Props) {
         </div>
       </div>
 
+      {/* Google Custom Search (Outreach) */}
+      <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
+        <div className="flex items-center gap-2 mb-4">
+          <Search size={18} className="text-[var(--color-green)]" />
+          <h3 className="font-semibold">Guest Post Outreach</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-[var(--color-text-dim)] mb-1">
+              Google CSE ID {settings.outreach?.googleCSEId && <span className="text-[var(--color-green)]">(configured: {settings.outreach.googleCSEId})</span>}
+            </label>
+            <input
+              type="text"
+              value={googleCSEId}
+              onChange={(e) => setGoogleCSEId(e.target.value)}
+              placeholder="Custom Search Engine ID"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-[var(--color-text-dim)] mb-1">
+              Google CSE API Key {settings.outreach?.googleCSEApiKey && <span className="text-[var(--color-green)]">(configured: {settings.outreach.googleCSEApiKey})</span>}
+            </label>
+            <input
+              type="password"
+              value={googleCSEApiKey}
+              onChange={(e) => setGoogleCSEApiKey(e.target.value)}
+              placeholder="Google Custom Search API key"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Password */}
       <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
         <div className="flex items-center gap-2 mb-4">
@@ -138,7 +181,7 @@ export function SettingsForm({ settings, onSaved }: Props) {
       <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
-          disabled={saving || (!anthropicKey && !bingKey && !gscJson && !newPassword)}
+          disabled={saving || (!anthropicKey && !bingKey && !gscJson && !googleCSEId && !googleCSEApiKey && !newPassword)}
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white rounded-lg transition-all disabled:opacity-50"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}

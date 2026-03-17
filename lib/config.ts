@@ -5,6 +5,7 @@ export interface SiteConfig {
   id: string;
   name: string;
   url: string;
+  sitemapUrl?: string;
 }
 
 export interface AppConfig {
@@ -18,6 +19,10 @@ export interface AppConfig {
   };
   gsc: {
     credentialsJson: string;
+  };
+  outreach: {
+    googleCSEId: string;
+    googleCSEApiKey?: string;
   };
   sites: SiteConfig[];
 }
@@ -35,6 +40,7 @@ const DEFAULT_CONFIG: AppConfig = {
   admin: { email: "shoumyachowdhury@gmail.com", passwordHash: "" },
   apiKeys: { anthropic: "", bing: "" },
   gsc: { credentialsJson: "" },
+  outreach: { googleCSEId: "" },
   sites: [],
 };
 
@@ -60,6 +66,15 @@ export function getApiKey(key: "anthropic" | "bing"): string {
 
 export function getGscCredentials(): string {
   return readConfig().gsc.credentialsJson || "";
+}
+
+export function getGoogleCSEId(): string {
+  return readConfig().outreach?.googleCSEId || "";
+}
+
+export function getGoogleCSEApiKey(): string {
+  const config = readConfig();
+  return config.outreach?.googleCSEApiKey || config.apiKeys.bing || "";
 }
 
 export function getSites(): SiteConfig[] {

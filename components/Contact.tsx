@@ -10,14 +10,14 @@ const links = [
   {
     icon: Linkedin,
     label: "LinkedIn",
-    value: "shoumyachowdhury",
-    href: "https://linkedin.com/in/shoumyachowdhury",
+    value: "shoumya-chowdhury",
+    href: "https://www.linkedin.com/in/shoumya-chowdhury/",
   },
   {
     icon: Github,
     label: "GitHub",
-    value: "shoumyachowdhury",
-    href: "https://github.com/shoumyachowdhury",
+    value: "shoumya-chy",
+    href: "https://github.com/shoumya-chy",
   },
   {
     icon: MapPin,

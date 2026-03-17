@@ -7,7 +7,7 @@ export function Footer() {
         </p>
         <div className="flex items-center gap-6 text-sm text-[var(--color-text-dim)]">
           <a
-            href="https://linkedin.com/in/shoumyachowdhury"
+            href="https://www.linkedin.com/in/shoumya-chowdhury/"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-[var(--color-text-muted)] transition-colors"
@@ -15,7 +15,7 @@ export function Footer() {
             LinkedIn
           </a>
           <a
-            href="https://github.com/shoumyachowdhury"
+            href="https://github.com/shoumya-chy"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-[var(--color-text-muted)] transition-colors"

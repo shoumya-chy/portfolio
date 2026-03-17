@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, Plus, Trash2, Loader2 } from "lucide-react";
+import { Globe, Plus, Trash2, Loader2, MapPin } from "lucide-react";
 
 interface Site {
   id: string;
   name: string;
   url: string;
+  sitemapUrl?: string;
 }
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 export function SiteManager({ sites, onUpdated }: Props) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
+  const [sitemapUrl, setSitemapUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -27,11 +29,16 @@ export function SiteManager({ sites, onUpdated }: Props) {
       const res = await fetch("/api/admin/sites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, url: url.startsWith("http") ? url : `https://${url}` }),
+        body: JSON.stringify({
+          name,
+          url: url.startsWith("http") ? url : `https://${url}`,
+          sitemapUrl: sitemapUrl || undefined,
+        }),
       });
       if (res.ok) {
         setName("");
         setUrl("");
+        setSitemapUrl("");
         onUpdated();
       }
     } finally {
@@ -74,6 +81,11 @@ export function SiteManager({ sites, onUpdated }: Props) {
               <div>
                 <p className="text-sm font-medium">{site.name}</p>
                 <p className="text-xs text-[var(--color-text-dim)] font-mono">{site.url}</p>
+                {site.sitemapUrl && (
+                  <p className="text-xs text-[var(--color-text-dim)] font-mono flex items-center gap-1 mt-0.5">
+                    <MapPin size={10} /> {site.sitemapUrl}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => removeSite(site.id)}
@@ -88,27 +100,37 @@ export function SiteManager({ sites, onUpdated }: Props) {
       )}
 
       {/* Add new */}
-      <div className="flex gap-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Site name"
-          className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-        />
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com"
-          className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
-        />
-        <button
-          onClick={addSite}
-          disabled={adding || !name || !url}
-          className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-[var(--color-green)] hover:opacity-90 text-white rounded-lg transition-all disabled:opacity-50"
-        >
-          {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-          Add
-        </button>
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Site name"
+            className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+          />
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com"
+            className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+          />
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={sitemapUrl}
+            onChange={(e) => setSitemapUrl(e.target.value)}
+            placeholder="Sitemap URL (optional, e.g. https://example.com/sitemap.xml)"
+            className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+          />
+          <button
+            onClick={addSite}
+            disabled={adding || !name || !url}
+            className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-[var(--color-green)] hover:opacity-90 text-white rounded-lg transition-all disabled:opacity-50"
+          >
+            {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Add
+          </button>
+        </div>
       </div>
     </div>
   );
