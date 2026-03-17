@@ -29,7 +29,7 @@ const links = [
 
 export function Contact() {
   return (
-    <section id="contact" className="py-24 px-6">
+    <section id="contact" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto text-center">
         <p className="section-heading">Contact</p>
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
@@ -47,7 +47,7 @@ export function Contact() {
               href={link.href}
               target={link.href.startsWith("http") ? "_blank" : undefined}
               rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
-              className="flex items-center gap-4 p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl hover:border-[var(--color-border-hover)] transition-all group card-glow"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl hover:border-[var(--color-border-hover)] transition-all group card-glow"
             >
               <div className="p-2.5 rounded-lg bg-[var(--color-accent-glow)] group-hover:bg-[var(--color-accent)] transition-colors">
                 <link.icon

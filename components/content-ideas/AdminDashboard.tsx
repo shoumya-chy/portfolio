@@ -149,7 +149,7 @@ export function AdminDashboard({ onLogout }: Props) {
     <div className="space-y-6">
       {/* Site Selector */}
       {sites.length > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
+        <div className="flex flex-wrap items-center gap-3 p-3 sm:p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
           <Globe size={18} className="text-[var(--color-accent)] shrink-0" />
           <span className="text-sm font-medium text-[var(--color-text-dim)] shrink-0">Site:</span>
           <div className="relative">

@@ -164,7 +164,7 @@ export function OutreachDashboard({ onLogout }: Props) {
     <div className="space-y-6">
       {/* Project Selector */}
       {projects.length > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
           <Zap size={18} className="text-[var(--color-accent)] shrink-0" />
           <span className="text-sm font-medium text-[var(--color-text-dim)] shrink-0">Project:</span>
           <div className="relative flex-1">
@@ -205,13 +205,13 @@ export function OutreachDashboard({ onLogout }: Props) {
       )}
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-[var(--color-green)] animate-pulse" />
           <span className="text-sm text-[var(--color-text-muted)]">Admin Mode</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleRefresh}
             disabled={isAnyLoading || !selectedProjectId}
@@ -269,7 +269,7 @@ export function OutreachDashboard({ onLogout }: Props) {
 
       {/* Stats Cards */}
       {stats && selectedProjectId && (
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
           <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
             <div className="text-xs text-[var(--color-text-dim)] mb-1">Found</div>
             <div className="text-2xl font-bold">{stats.totalFound}</div>

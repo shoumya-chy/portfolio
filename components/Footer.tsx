@@ -1,7 +1,7 @@
 export function Footer() {
   return (
-    <footer className="py-8 px-6 border-t border-[var(--color-border)]">
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+    <footer className="py-6 sm:py-8 px-4 sm:px-6 border-t border-[var(--color-border)]">
+      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
         <p className="text-sm text-[var(--color-text-dim)]">
           &copy; {new Date().getFullYear()} Shoumya Chowdhury. Built with Next.js.
         </p>

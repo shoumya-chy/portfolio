@@ -2,7 +2,7 @@ import { ArrowDown, MapPin } from "lucide-react";
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-6 pt-20">
+    <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 pt-20">
       {/* Subtle grid background */}
       <div
         className="absolute inset-0 opacity-[0.03]"
@@ -13,7 +13,7 @@ export function Hero() {
       />
 
       {/* Gradient orb */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[var(--color-accent)] opacity-[0.04] blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] md:w-[600px] md:h-[600px] rounded-full bg-[var(--color-accent)] opacity-[0.04] blur-[120px] pointer-events-none" />
 
       <div className="relative max-w-3xl text-center">
         <div className="animate-fade-up">

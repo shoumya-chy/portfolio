@@ -39,7 +39,7 @@ const experiences = [
 
 export function Experience() {
   return (
-    <section id="experience" className="py-24 px-6">
+    <section id="experience" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         <p className="section-heading">Experience</p>
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
@@ -67,7 +67,7 @@ export function Experience() {
                   />
                 </div>
 
-                <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl hover:border-[var(--color-border-hover)] transition-colors card-glow">
+                <div className="p-4 sm:p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl hover:border-[var(--color-border-hover)] transition-colors card-glow">
                   <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
                     <div>
                       <h3 className="text-lg font-semibold">{exp.role}</h3>

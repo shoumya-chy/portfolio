@@ -55,7 +55,7 @@ export function Navbar() {
             : "bg-transparent"
         }`}
       >
-        <nav className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
+        <nav className="mx-auto max-w-6xl px-4 sm:px-6 py-4 flex items-center justify-between">
           <Link
             href="/"
             className="text-lg font-bold tracking-tight hover:text-[var(--color-accent)] transition-colors"

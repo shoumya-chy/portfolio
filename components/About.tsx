@@ -8,14 +8,14 @@ const highlights = [
 
 export function About() {
   return (
-    <section id="about" className="py-24 px-6">
+    <section id="about" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         <p className="section-heading">About</p>
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
           Developer, optimizer, builder.
         </h2>
 
-        <div className="mt-8 grid md:grid-cols-[1fr_auto] gap-12 items-start">
+        <div className="mt-8 grid md:grid-cols-[1fr_auto] gap-6 md:gap-12 items-start">
           <div className="space-y-4 text-[var(--color-text-muted)] leading-relaxed">
             <p>
               I&apos;m a Full-Stack Developer and SEO Specialist based in Melbourne,
@@ -36,7 +36,7 @@ export function About() {
             </p>
           </div>
 
-          <div className="flex md:flex-col gap-4">
+          <div className="flex flex-col sm:flex-row md:flex-col gap-3 sm:gap-4">
             {highlights.map((h, i) => (
               <div
                 key={i}

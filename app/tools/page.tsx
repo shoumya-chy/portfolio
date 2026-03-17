@@ -29,7 +29,7 @@ const tools = [
 
 export default function ToolsPage() {
   return (
-    <section className="min-h-screen pt-28 pb-24 px-6">
+    <section className="min-h-screen pt-24 sm:pt-28 pb-16 sm:pb-24 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         <Link
           href="/"

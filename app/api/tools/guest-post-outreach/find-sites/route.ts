@@ -35,8 +35,10 @@ export async function POST(request: Request) {
       prospects: result,
     });
   } catch (error) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.log("[FindSites] Error:", msg);
     return NextResponse.json(
-      { error: "Failed to find sites" },
+      { error: msg },
       { status: 500 }
     );
   }
