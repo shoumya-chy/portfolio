@@ -32,6 +32,30 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PUT(req: Request) {
+  const isAdmin = await getAuthFromCookies();
+  if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const { id, name, url, sitemapUrl } = await req.json();
+    if (!id) return NextResponse.json({ error: "Site ID required" }, { status: 400 });
+
+    const config = readConfig();
+    const idx = config.sites.findIndex((s) => s.id === id);
+    if (idx === -1) return NextResponse.json({ error: "Site not found" }, { status: 404 });
+
+    if (name !== undefined) config.sites[idx].name = name;
+    if (url !== undefined) config.sites[idx].url = url;
+    if (sitemapUrl !== undefined) config.sites[idx].sitemapUrl = sitemapUrl;
+
+    writeConfig(config);
+    return NextResponse.json({ success: true, site: config.sites[idx] });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update site";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request) {
   const isAdmin = await getAuthFromCookies();
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

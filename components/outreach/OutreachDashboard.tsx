@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, LogOut, Loader2, AlertCircle, ChevronDown, Zap, Mail, CheckCircle2, Plus } from "lucide-react";
+import { RefreshCw, LogOut, Loader2, AlertCircle, ChevronDown, Zap, Mail, CheckCircle2, Plus, Pencil } from "lucide-react";
 import { ProspectsList } from "./ProspectsList";
 import { ProjectManager } from "./ProjectManager";
 import type { OutreachProject, OutreachProspect, OutreachStats } from "@/lib/outreach/types";
@@ -18,6 +18,7 @@ export function OutreachDashboard({ onLogout }: Props) {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showProjectManager, setShowProjectManager] = useState(false);
+  const [editingProject, setEditingProject] = useState<OutreachProject | null>(null);
 
   const setLoadingKey = (key: string, val: boolean) =>
     setLoading((p) => ({ ...p, [key]: val }));
@@ -211,12 +212,21 @@ export function OutreachDashboard({ onLogout }: Props) {
             </select>
             <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-dim)]" />
           </div>
+          {currentProject && (
+            <button
+              onClick={() => setEditingProject(currentProject)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-card)] transition-colors"
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
+          )}
           <button
             onClick={() => setShowProjectManager(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white rounded-lg transition-colors"
           >
             <Plus size={14} />
-            New Project
+            New
           </button>
         </div>
       )}
@@ -349,9 +359,18 @@ export function OutreachDashboard({ onLogout }: Props) {
         </div>
       ) : null}
 
-      {/* Project Manager Modal */}
+      {/* Project Manager Modal — Create */}
       {showProjectManager && (
         <ProjectManager onClose={() => setShowProjectManager(false)} onCreated={handleProjectCreated} />
+      )}
+
+      {/* Project Manager Modal — Edit */}
+      {editingProject && (
+        <ProjectManager
+          onClose={() => setEditingProject(null)}
+          onCreated={() => { setEditingProject(null); handleProjectCreated(); }}
+          editProject={editingProject}
+        />
       )}
     </div>
   );

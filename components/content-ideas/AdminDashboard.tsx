@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, LogOut, Loader2, Download, Trash2, AlertCircle, ChevronDown, Globe } from "lucide-react";
+import { RefreshCw, LogOut, Loader2, Download, Sparkles, AlertCircle, ChevronDown, Globe } from "lucide-react";
 import { StatsCards } from "./StatsCards";
 import { KeywordTable } from "./KeywordTable";
 import { ContentIdeasList } from "./ContentIdeas";
-import { TopicClusters } from "./TopicClusters";
 import type { KeywordData, TrendingTopic, AnalysisResult, Keyword } from "@/lib/types";
 
 interface SiteOption {
@@ -196,7 +195,7 @@ export function AdminDashboard({ onLogout }: Props) {
             disabled={loading.analysis || !allKeywords.length}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white rounded-lg disabled:opacity-50 transition-colors"
           >
-            {loading.analysis ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            {loading.analysis ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             {loading.analysis ? "Analyzing..." : "Generate Ideas"}
           </button>
           <button
@@ -233,13 +232,9 @@ export function AdminDashboard({ onLogout }: Props) {
       {/* Stats */}
       <StatsCards
         totalKeywords={allKeywords.length}
-        totalImpressions={(gsc?.totalImpressions || 0) + (bing?.totalImpressions || 0)}
-        totalClicks={(gsc?.totalClicks || 0) + (bing?.totalClicks || 0)}
-        avgPosition={
-          gsc?.avgPosition && bing?.avgPosition
-            ? Math.round(((gsc.avgPosition + bing.avgPosition) / 2) * 10) / 10
-            : gsc?.avgPosition || bing?.avgPosition || 0
-        }
+        totalImpressions={gsc?.totalImpressions || 0}
+        totalClicks={gsc?.totalClicks || 0}
+        avgPosition={gsc?.avgPosition || 0}
         ideasGenerated={analysis?.ideas?.length || 0}
         dataSources={
           (gsc ? 1 : 0) + (bing ? 1 : 0) +
@@ -297,15 +292,15 @@ export function AdminDashboard({ onLogout }: Props) {
       {/* Analysis Results */}
       {analysis && (
         <>
+          {analysis.summary && (
+            <div className="p-4 bg-[var(--color-accent-glow)] border border-[var(--color-accent)]/20 rounded-xl">
+              <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{analysis.summary}</p>
+              <p className="text-xs text-[var(--color-text-dim)] mt-2">
+                Analyzed at {new Date(analysis.analyzedAt).toLocaleString()}
+              </p>
+            </div>
+          )}
           <ContentIdeasList ideas={analysis.ideas} />
-          <TopicClusters clusters={analysis.clusters} gaps={analysis.gaps} />
-          <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
-            <h3 className="text-sm font-semibold text-[var(--color-text-dim)] mb-2">Summary</h3>
-            <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{analysis.summary}</p>
-            <p className="text-xs text-[var(--color-text-dim)] mt-2">
-              Analyzed at {new Date(analysis.analyzedAt).toLocaleString()}
-            </p>
-          </div>
         </>
       )}
     </div>

@@ -3,9 +3,21 @@
 import { useState } from "react";
 import { X, Loader2, AlertCircle } from "lucide-react";
 
+interface EditProject {
+  id: string;
+  name: string;
+  niche: string;
+  emailAddress: string;
+  domainFilters: string[];
+  emailsPerWeek: number;
+  smtpConfig: { host: string; port: number; secure: boolean; username: string; password: string };
+  imapConfig: { host: string; port: number; secure: boolean; username: string; password: string };
+}
+
 interface Props {
   onClose: () => void;
   onCreated: () => void;
+  editProject?: EditProject;
 }
 
 interface FormData {
@@ -30,21 +42,22 @@ interface FormData {
   };
 }
 
-export function ProjectManager({ onClose, onCreated }: Props) {
+export function ProjectManager({ onClose, onCreated, editProject }: Props) {
+  const isEdit = !!editProject;
   const [formData, setFormData] = useState<FormData>({
-    name: "",
-    niche: "",
-    emailAddress: "",
-    domainFilters: "",
-    emailsPerWeek: 20,
-    smtp: {
+    name: editProject?.name || "",
+    niche: editProject?.niche || "",
+    emailAddress: editProject?.emailAddress || "",
+    domainFilters: editProject?.domainFilters?.join(", ") || "",
+    emailsPerWeek: editProject?.emailsPerWeek || 20,
+    smtp: editProject?.smtpConfig || {
       host: "smtp.hostinger.com",
       port: 587,
       secure: false,
       username: "",
       password: "",
     },
-    imap: {
+    imap: editProject?.imapConfig || {
       host: "imap.hostinger.com",
       port: 993,
       secure: true,
@@ -82,13 +95,14 @@ export function ProjectManager({ onClose, onCreated }: Props) {
       };
 
       const res = await fetch("/api/tools/guest-post-outreach/projects", {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(isEdit ? { ...payload, id: editProject?.id } : payload),
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to create project (${res.status})`);
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Failed to ${isEdit ? "update" : "create"} project (${res.status})`);
       }
 
       onCreated();
@@ -105,7 +119,7 @@ export function ProjectManager({ onClose, onCreated }: Props) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 flex items-center justify-between p-6 border-b border-[var(--color-border)] bg-[var(--color-bg-card)]">
-          <h2 className="text-lg font-semibold">Create New Project</h2>
+          <h2 className="text-lg font-semibold">{isEdit ? "Edit Project" : "Create New Project"}</h2>
           <button
             onClick={onClose}
             className="p-1 text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
@@ -302,7 +316,7 @@ export function ProjectManager({ onClose, onCreated }: Props) {
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white rounded-lg disabled:opacity-50 transition-colors"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : null}
-              Create Project
+              {isEdit ? "Save Changes" : "Create Project"}
             </button>
           </div>
         </form>

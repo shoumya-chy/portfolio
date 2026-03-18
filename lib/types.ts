@@ -41,6 +41,8 @@ export interface ContentIdea {
   difficulty: "low" | "medium" | "high";
   contentType: "blog" | "guide" | "case-study" | "tool" | "video";
   estimatedSearchVolume: string;
+  day?: number;
+  reason?: string;
 }
 
 export interface TopicCluster {

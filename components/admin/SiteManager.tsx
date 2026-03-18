@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, Plus, Trash2, Loader2, MapPin } from "lucide-react";
+import { Globe, Plus, Trash2, Loader2, MapPin, Pencil, Check, X } from "lucide-react";
 
 interface Site {
   id: string;
@@ -21,6 +21,11 @@ export function SiteManager({ sites, onUpdated }: Props) {
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editUrl, setEditUrl] = useState("");
+  const [editSitemapUrl, setEditSitemapUrl] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const addSite = async () => {
     if (!name || !url) return;
@@ -43,6 +48,36 @@ export function SiteManager({ sites, onUpdated }: Props) {
       }
     } finally {
       setAdding(false);
+    }
+  };
+
+  const startEdit = (site: Site) => {
+    setEditingId(site.id);
+    setEditName(site.name);
+    setEditUrl(site.url);
+    setEditSitemapUrl(site.sitemapUrl || "");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editName || !editUrl) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/sites", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingId,
+          name: editName,
+          url: editUrl.startsWith("http") ? editUrl : `https://${editUrl}`,
+          sitemapUrl: editSitemapUrl || undefined,
+        }),
+      });
+      if (res.ok) {
+        setEditingId(null);
+        onUpdated();
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -76,24 +111,52 @@ export function SiteManager({ sites, onUpdated }: Props) {
           {sites.map((site) => (
             <div
               key={site.id}
-              className="flex items-center justify-between gap-3 px-3 py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg"
+              className="px-3 py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg"
             >
-              <div>
-                <p className="text-sm font-medium">{site.name}</p>
-                <p className="text-xs text-[var(--color-text-dim)] font-mono">{site.url}</p>
-                {site.sitemapUrl && (
-                  <p className="text-xs text-[var(--color-text-dim)] font-mono flex items-center gap-1 mt-0.5">
-                    <MapPin size={10} /> {site.sitemapUrl}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => removeSite(site.id)}
-                disabled={deleting === site.id}
-                className="p-1.5 text-red-400/60 hover:text-red-400 transition-colors"
-              >
-                {deleting === site.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              </button>
+              {editingId === site.id ? (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Site name" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
+                    <input value={editUrl} onChange={(e) => setEditUrl(e.target.value)} placeholder="URL" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
+                  </div>
+                  <div className="flex gap-2">
+                    <input value={editSitemapUrl} onChange={(e) => setEditSitemapUrl(e.target.value)} placeholder="Sitemap URL (optional)" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
+                    <button onClick={saveEdit} disabled={saving} className="p-1.5 text-[var(--color-green)] hover:opacity-80">
+                      {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="p-1.5 text-[var(--color-text-dim)] hover:text-[var(--color-text)]">
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{site.name}</p>
+                    <p className="text-xs text-[var(--color-text-dim)] font-mono">{site.url}</p>
+                    {site.sitemapUrl && (
+                      <p className="text-xs text-[var(--color-text-dim)] font-mono flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} /> {site.sitemapUrl}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => startEdit(site)}
+                      className="p-1.5 text-[var(--color-text-dim)] hover:text-[var(--color-accent)] transition-colors"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => removeSite(site.id)}
+                      disabled={deleting === site.id}
+                      className="p-1.5 text-red-400/60 hover:text-red-400 transition-colors"
+                    >
+                      {deleting === site.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

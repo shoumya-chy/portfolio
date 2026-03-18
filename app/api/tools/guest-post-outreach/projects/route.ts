@@ -73,6 +73,50 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  const isAdmin = await getAuthFromCookies();
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id } = body;
+    if (!id) return NextResponse.json({ error: "Project id required" }, { status: 400 });
+
+    const { getProject } = await import("@/lib/outreach/storage");
+    const existing = getProject(id);
+    if (!existing) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+
+    const updated = {
+      ...existing,
+      name: body.name ?? existing.name,
+      siteId: body.siteId ?? existing.siteId,
+      niche: body.niche ?? existing.niche,
+      emailAddress: body.emailAddress ?? existing.emailAddress,
+      domainFilters: body.domainFilters ?? existing.domainFilters,
+      emailsPerWeek: body.emailsPerWeek ?? existing.emailsPerWeek,
+      active: body.active ?? existing.active,
+      smtpConfig: body.smtpConfig ? {
+        ...existing.smtpConfig,
+        ...body.smtpConfig,
+        password: body.smtpConfig.password === "••••••" ? existing.smtpConfig.password : (body.smtpConfig.password || existing.smtpConfig.password),
+      } : existing.smtpConfig,
+      imapConfig: body.imapConfig ? {
+        ...existing.imapConfig,
+        ...body.imapConfig,
+        password: body.imapConfig.password === "••••••" ? existing.imapConfig.password : (body.imapConfig.password || existing.imapConfig.password),
+      } : existing.imapConfig,
+    };
+
+    saveProject(updated);
+    return NextResponse.json({ project: updated });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to update project";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   const isAdmin = await getAuthFromCookies();
   if (!isAdmin) {

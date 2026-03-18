@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const cached = getCache<AnalysisResult>("analysis", siteUrl);
     if (cached) return NextResponse.json({ data: cached, fromCache: true });
 
-    const data = await analyzeContentIdeas(keywords, trendingTopics || []);
+    const data = await analyzeContentIdeas(keywords, trendingTopics || [], siteUrl);
     setCache("analysis", data, siteUrl);
     return NextResponse.json({ data, fromCache: false });
   } catch (err) {
