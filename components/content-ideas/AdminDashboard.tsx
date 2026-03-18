@@ -314,6 +314,56 @@ export function AdminDashboard({ onLogout }: Props) {
             </div>
           )}
           <ContentIdeasList ideas={analysis.ideas} />
+
+          {/* Trending Content Opportunities from Reddit & Quora */}
+          {analysis.trendingIdeas && analysis.trendingIdeas.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-lg">🔥</span>
+                <h3 className="text-lg font-semibold">Trending Content Opportunities</h3>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-orange-400/10 text-orange-400 border border-orange-400/20">
+                  Reddit & Quora
+                </span>
+              </div>
+              <div className="grid gap-3">
+                {analysis.trendingIdeas.map((idea, i) => (
+                  <div key={i} className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl hover:border-[var(--color-border-hover)] transition-all">
+                    <div className="flex items-start gap-3">
+                      <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold ${
+                        idea.source === "reddit" ? "bg-orange-400/10 text-orange-400" :
+                        idea.source === "quora" ? "bg-red-400/10 text-red-400" :
+                        "bg-purple-400/10 text-purple-400"
+                      }`}>
+                        {idea.source === "reddit" ? "R" : idea.source === "quora" ? "Q" : "R+Q"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold mb-1">{idea.title}</h4>
+                        <p className="text-sm text-[var(--color-text-muted)] mb-2">{idea.description}</p>
+                        {idea.sourceTopics?.length > 0 && (
+                          <p className="text-xs text-[var(--color-text-dim)] mb-2 italic">
+                            Inspired by: {idea.sourceTopics.join("; ")}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-1.5">
+                          {idea.relatedKeywords?.slice(0, 4).map((kw, j) => (
+                            <span key={j} className="px-2 py-0.5 text-xs font-mono text-[var(--color-text-dim)] border border-[var(--color-border)] rounded-md">
+                              {kw}
+                            </span>
+                          ))}
+                          <span className="px-1.5 py-0.5 text-xs font-mono rounded border" style={{
+                            color: idea.difficulty === "low" ? "var(--color-green)" : idea.difficulty === "medium" ? "var(--color-orange)" : "#ef4444",
+                            borderColor: idea.difficulty === "low" ? "var(--color-green)" : idea.difficulty === "medium" ? "var(--color-orange)" : "#ef4444",
+                          }}>
+                            {idea.difficulty}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

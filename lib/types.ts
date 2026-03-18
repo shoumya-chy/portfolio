@@ -76,8 +76,18 @@ export interface ContentGap {
   opportunity: "high" | "medium" | "low";
 }
 
+export interface TrendingContentIdea {
+  title: string;
+  description: string;
+  sourceTopics: string[];
+  source: "reddit" | "quora" | "both";
+  relatedKeywords: string[];
+  difficulty: "low" | "medium" | "high";
+}
+
 export interface AnalysisResult {
   ideas: ContentIdea[];
+  trendingIdeas: TrendingContentIdea[];
   clusters: TopicCluster[];
   gaps: ContentGap[];
   summary: string;
