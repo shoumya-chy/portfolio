@@ -6,6 +6,8 @@ export interface SiteConfig {
   name: string;
   url: string;
   sitemapUrl?: string;
+  wpApiUrl?: string;
+  wpApiKey?: string;
 }
 
 export interface AppConfig {

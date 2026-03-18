@@ -15,14 +15,14 @@ export async function POST(req: Request) {
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { name, url, sitemapUrl } = await req.json();
+    const { name, url, sitemapUrl, wpApiUrl, wpApiKey } = await req.json();
     if (!name || !url) {
       return NextResponse.json({ error: "Name and URL required" }, { status: 400 });
     }
 
     const config = readConfig();
     const id = Date.now().toString(36);
-    const site = { id, name, url, ...(sitemapUrl ? { sitemapUrl } : {}) };
+    const site = { id, name, url, ...(sitemapUrl ? { sitemapUrl } : {}), ...(wpApiUrl ? { wpApiUrl } : {}), ...(wpApiKey ? { wpApiKey } : {}) };
     config.sites.push(site);
     writeConfig(config);
     return NextResponse.json({ success: true, site });
@@ -37,7 +37,7 @@ export async function PUT(req: Request) {
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { id, name, url, sitemapUrl } = await req.json();
+    const { id, name, url, sitemapUrl, wpApiUrl, wpApiKey } = await req.json();
     if (!id) return NextResponse.json({ error: "Site ID required" }, { status: 400 });
 
     const config = readConfig();
@@ -47,6 +47,8 @@ export async function PUT(req: Request) {
     if (name !== undefined) config.sites[idx].name = name;
     if (url !== undefined) config.sites[idx].url = url;
     if (sitemapUrl !== undefined) config.sites[idx].sitemapUrl = sitemapUrl;
+    if (wpApiUrl !== undefined) config.sites[idx].wpApiUrl = wpApiUrl;
+    if (wpApiKey !== undefined) config.sites[idx].wpApiKey = wpApiKey;
 
     writeConfig(config);
     return NextResponse.json({ success: true, site: config.sites[idx] });

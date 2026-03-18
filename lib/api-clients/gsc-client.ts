@@ -41,47 +41,97 @@ export async function fetchGSCData(siteUrl: string): Promise<KeywordData> {
   if (!siteUrl) throw new Error("Site URL is required");
 
   const accessToken = await getAccessToken();
-  const endDate = new Date().toISOString().split("T")[0];
-  const startDate = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  const res = await fetch(
-    `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        startDate,
-        endDate,
-        dimensions: ["query"],
-        rowLimit: 500,
-        type: "web",
-      }),
+  // GSC API uses last 3 days of delay — end date should be 3 days ago for accurate totals
+  const endDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const startDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  // Normalize siteUrl — GSC needs exact match (try with trailing slash)
+  const siteUrlVariants = [
+    siteUrl,
+    siteUrl.endsWith("/") ? siteUrl.slice(0, -1) : siteUrl + "/",
+  ];
+
+  let allKeywords: Keyword[] = [];
+  let fetchedSiteUrl = siteUrl;
+
+  for (const tryUrl of siteUrlVariants) {
+    try {
+      // Fetch ALL keywords using pagination (GSC max per request is 25000)
+      const keywords: Keyword[] = [];
+      let startRow = 0;
+      const PAGE_SIZE = 25000;
+
+      while (true) {
+        const res = await fetch(
+          `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(tryUrl)}/searchAnalytics/query`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              startDate,
+              endDate,
+              dimensions: ["query"],
+              rowLimit: PAGE_SIZE,
+              startRow,
+              type: "web",
+            }),
+          }
+        );
+
+        if (!res.ok) {
+          if (tryUrl !== siteUrlVariants[siteUrlVariants.length - 1]) break;
+          const err = await res.text();
+          throw new Error(`GSC API error: ${res.status} - ${err}`);
+        }
+
+        const data = await res.json();
+        const rows = data.rows || [];
+
+        if (rows.length === 0) break;
+
+        for (const row of rows) {
+          keywords.push({
+            query: row.keys[0],
+            impressions: row.impressions,
+            clicks: row.clicks,
+            ctr: Math.round(row.ctr * 10000) / 100,
+            position: Math.round(row.position * 10) / 10,
+            source: "gsc" as const,
+          });
+        }
+
+        console.log(`[GSC] Fetched ${keywords.length} keywords so far (batch: ${rows.length})`);
+
+        // If we got fewer rows than PAGE_SIZE, we've fetched everything
+        if (rows.length < PAGE_SIZE) break;
+        startRow += PAGE_SIZE;
+      }
+
+      if (keywords.length > 0) {
+        allKeywords = keywords;
+        fetchedSiteUrl = tryUrl;
+        break;
+      }
+    } catch (err) {
+      // If this variant failed and it's not the last one, try next
+      if (tryUrl === siteUrlVariants[siteUrlVariants.length - 1]) {
+        throw err;
+      }
+      console.log(`[GSC] Trying alternative URL format...`);
     }
-  );
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`GSC API error: ${res.status} - ${err}`);
   }
 
-  const data = await res.json();
-  const rows = data.rows || [];
+  const totalImpressions = allKeywords.reduce((s, k) => s + k.impressions, 0);
+  const totalClicks = allKeywords.reduce((s, k) => s + k.clicks, 0);
+  const avgPosition = allKeywords.length
+    ? Math.round((allKeywords.reduce((s, k) => s + k.position, 0) / allKeywords.length) * 10) / 10
+    : 0;
 
-  const keywords: Keyword[] = rows.map((row: { keys: string[]; impressions: number; clicks: number; ctr: number; position: number }) => ({
-    query: row.keys[0],
-    impressions: row.impressions,
-    clicks: row.clicks,
-    ctr: Math.round(row.ctr * 10000) / 100,
-    position: Math.round(row.position * 10) / 10,
-    source: "gsc" as const,
-  }));
+  console.log(`[GSC] Final: ${allKeywords.length} keywords, ${totalImpressions} impressions, ${totalClicks} clicks for ${fetchedSiteUrl}`);
 
-  const totalImpressions = keywords.reduce((s, k) => s + k.impressions, 0);
-  const totalClicks = keywords.reduce((s, k) => s + k.clicks, 0);
-  const avgPosition = keywords.length ? Math.round((keywords.reduce((s, k) => s + k.position, 0) / keywords.length) * 10) / 10 : 0;
-
-  return { keywords, totalImpressions, totalClicks, avgPosition, fetchedAt: new Date().toISOString() };
+  return { keywords: allKeywords, totalImpressions, totalClicks, avgPosition, fetchedAt: new Date().toISOString() };
 }

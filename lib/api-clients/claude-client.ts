@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Keyword, TrendingTopic, AnalysisResult } from "@/lib/types";
-import { getApiKey, getSites } from "@/lib/config";
-import { fetchSitemap } from "@/lib/api-clients/sitemap-parser";
+import { getApiKey } from "@/lib/config";
+import { fetchWordPressData, formatWPContentForAnalysis } from "@/lib/api-clients/wordpress-client";
 
 export async function analyzeContentIdeas(
   keywords: Keyword[],
@@ -11,18 +11,16 @@ export async function analyzeContentIdeas(
   const apiKey = getApiKey("anthropic");
   if (!apiKey) throw new Error("Anthropic API key not configured. Add it in Settings.");
 
-  // Fetch existing pages from sitemap to avoid duplicates
-  let existingPages: string[] = [];
+  // Fetch WordPress content data for dedup and analysis
+  let existingContentBlock = "";
+
   if (siteUrl) {
-    try {
-      const sites = getSites();
-      const site = sites.find(s => s.url === siteUrl);
-      const sitemapUrl = site?.sitemapUrl || `${siteUrl.replace(/\/$/, "")}/sitemap.xml`;
-      const sitemapUrls = await fetchSitemap(sitemapUrl);
-      existingPages = sitemapUrls.map(u => u.loc);
-      console.log(`[Analysis] Found ${existingPages.length} existing pages from sitemap`);
-    } catch (err) {
-      console.log("[Analysis] Sitemap fetch failed:", err instanceof Error ? err.message : err);
+    const wpData = await fetchWordPressData(siteUrl);
+    if (wpData && wpData.content.length > 0) {
+      existingContentBlock = formatWPContentForAnalysis(wpData);
+      console.log(`[Analysis] Using WordPress data: ${wpData.content.length} posts/pages`);
+    } else {
+      console.log(`[Analysis] No WordPress data available for ${siteUrl}. Install the SEO Bridge plugin for better content dedup.`);
     }
   }
 
@@ -30,54 +28,53 @@ export async function analyzeContentIdeas(
 
   const topKeywords = keywords
     .sort((a, b) => b.impressions - a.impressions)
-    .slice(0, 100)
-    .map((k) => `"${k.query}" (imp: ${k.impressions}, clicks: ${k.clicks}, pos: ${k.position})`)
+    .slice(0, 150)
+    .map((k) => `${k.query} | imp: ${k.impressions} | clicks: ${k.clicks} | pos: ${k.position}`)
     .join("\n");
 
   const topTopics = trendingTopics
     .slice(0, 20)
-    .map((t) => `"${t.title}" (source: ${t.source}${t.subreddit ? `, r/${t.subreddit}` : ""})`)
+    .map((t) => `${t.title} (${t.source}${t.subreddit ? `, r/${t.subreddit}` : ""})`)
     .join("\n");
 
-  const existingPagesList = existingPages.length > 0
-    ? `\n## EXISTING PAGES ON THIS SITE (${existingPages.length} pages — DO NOT suggest content that already exists):\n${existingPages.slice(0, 200).map(u => {
-        try { return new URL(u).pathname; } catch { return u; }
-      }).join("\n")}`
-    : "";
+  const prompt = `You are an SEO content strategist. I need you to suggest 10 NEW articles to write.
 
-  const prompt = `You are an SEO content strategist. Based on the search data and trending topics below, create a PRIORITY-RANKED content plan for the next 7 days.
+${existingContentBlock}
 
-## Search Console Keywords (top 100):
+## KEYWORD DATA FROM SEARCH CONSOLE & BING (last 28 days)
+These are queries people search and find this site for. "imp" = impressions, "pos" = average position.
 ${topKeywords}
 
-## Trending Topics (Reddit & Quora):
-${topTopics}
-${existingPagesList}
+## TRENDING TOPICS FROM REDDIT & QUORA
+${topTopics || "(none available)"}
 
-RULES:
-1. Return EXACTLY 7 content ideas — one per day for the next week
-2. Rank by PRIORITY — Day 1 should be the highest-impact content to publish first
-3. Priority is based on: high impressions + poor position (quick wins), trending topics, content gaps
-4. NEVER suggest content that already exists on the site (check the existing pages list)
-5. Each idea must be specific and actionable — not generic
-6. Focus on topics where the site already gets impressions but needs better content to rank higher
-7. Include the target keyword for each idea
+## YOUR TASK
+Generate exactly 10 NEW content ideas ranked by priority (1 = publish first).
 
-Return JSON ONLY:
+CRITICAL RULES:
+- NEVER suggest a topic that already exists on the site. Read the existing content list very carefully. If there's already an article about "SAT to ATAR conversion", do NOT suggest anything about SAT-to-ATAR conversions. If there's "how long for coe", do NOT suggest anything about CoE processing times.
+- Look at keywords where the site gets HIGH impressions but has a POOR position (position > 10). These are the biggest opportunities.
+- Also look for keyword clusters — groups of related queries that could be answered by one comprehensive article.
+- Cross-reference with trending Reddit/Quora topics for timely content.
+- Each idea must target a specific keyword or keyword cluster from the data.
+- Include the PRIMARY keyword to target in relatedKeywords[0].
+- If thin content exists (under 500 words), you may suggest expanding it — but mark it clearly as "UPDATE existing" in the title.
+
+Return ONLY valid JSON, no other text:
 {
   "ideas": [
     {
-      "title": "Exact article title to use",
-      "description": "What to cover in 2-3 sentences",
-      "relatedKeywords": ["primary keyword", "secondary keyword"],
+      "title": "Exact article title",
+      "description": "What to cover and why this will rank (2-3 sentences)",
+      "relatedKeywords": ["primary target keyword", "secondary keyword"],
       "difficulty": "low|medium|high",
       "contentType": "blog|guide|case-study|tool|video",
       "estimatedSearchVolume": "low|medium|high",
       "day": 1,
-      "reason": "Why this is priority — e.g. 'Getting 79 impressions at position 9.1, needs dedicated page to rank top 3'"
+      "reason": "Why this is high priority — reference actual keyword data"
     }
   ],
-  "summary": "2-3 sentence summary of the 7-day content strategy"
+  "summary": "Brief strategy summary"
 }`;
 
   const message = await client.messages.create({

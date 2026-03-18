@@ -8,6 +8,8 @@ interface Site {
   name: string;
   url: string;
   sitemapUrl?: string;
+  wpApiUrl?: string;
+  wpApiKey?: string;
 }
 
 interface Props {
@@ -19,12 +21,16 @@ export function SiteManager({ sites, onUpdated }: Props) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [sitemapUrl, setSitemapUrl] = useState("");
+  const [wpApiUrl, setWpApiUrl] = useState("");
+  const [wpApiKey, setWpApiKey] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editUrl, setEditUrl] = useState("");
   const [editSitemapUrl, setEditSitemapUrl] = useState("");
+  const [editWpApiUrl, setEditWpApiUrl] = useState("");
+  const [editWpApiKey, setEditWpApiKey] = useState("");
   const [saving, setSaving] = useState(false);
 
   const addSite = async () => {
@@ -38,12 +44,16 @@ export function SiteManager({ sites, onUpdated }: Props) {
           name,
           url: url.startsWith("http") ? url : `https://${url}`,
           sitemapUrl: sitemapUrl || undefined,
+          wpApiUrl: wpApiUrl || undefined,
+          wpApiKey: wpApiKey || undefined,
         }),
       });
       if (res.ok) {
         setName("");
         setUrl("");
         setSitemapUrl("");
+        setWpApiUrl("");
+        setWpApiKey("");
         onUpdated();
       }
     } finally {
@@ -56,6 +66,8 @@ export function SiteManager({ sites, onUpdated }: Props) {
     setEditName(site.name);
     setEditUrl(site.url);
     setEditSitemapUrl(site.sitemapUrl || "");
+    setEditWpApiUrl(site.wpApiUrl || "");
+    setEditWpApiKey(site.wpApiKey || "");
   };
 
   const saveEdit = async () => {
@@ -70,6 +82,8 @@ export function SiteManager({ sites, onUpdated }: Props) {
           name: editName,
           url: editUrl.startsWith("http") ? editUrl : `https://${editUrl}`,
           sitemapUrl: editSitemapUrl || undefined,
+          wpApiUrl: editWpApiUrl || undefined,
+          wpApiKey: editWpApiKey || undefined,
         }),
       });
       if (res.ok) {
@@ -119,8 +133,12 @@ export function SiteManager({ sites, onUpdated }: Props) {
                     <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Site name" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
                     <input value={editUrl} onChange={(e) => setEditUrl(e.target.value)} placeholder="URL" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
                   </div>
+                  <input value={editSitemapUrl} onChange={(e) => setEditSitemapUrl(e.target.value)} placeholder="Sitemap URL (optional)" className="w-full px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
                   <div className="flex gap-2">
-                    <input value={editSitemapUrl} onChange={(e) => setEditSitemapUrl(e.target.value)} placeholder="Sitemap URL (optional)" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
+                    <input value={editWpApiUrl} onChange={(e) => setEditWpApiUrl(e.target.value)} placeholder="WP API URL (optional)" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
+                    <input value={editWpApiKey} onChange={(e) => setEditWpApiKey(e.target.value)} placeholder="WP API Key" className="flex-1 px-2 py-1 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]" />
+                  </div>
+                  <div className="flex gap-2 justify-end">
                     <button onClick={saveEdit} disabled={saving} className="p-1.5 text-[var(--color-green)] hover:opacity-80">
                       {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                     </button>
@@ -137,6 +155,11 @@ export function SiteManager({ sites, onUpdated }: Props) {
                     {site.sitemapUrl && (
                       <p className="text-xs text-[var(--color-text-dim)] font-mono flex items-center gap-1 mt-0.5">
                         <MapPin size={10} /> {site.sitemapUrl}
+                      </p>
+                    )}
+                    {site.wpApiUrl && (
+                      <p className="text-xs text-[var(--color-green)] font-mono flex items-center gap-1 mt-0.5">
+                        <Globe size={10} /> WP Bridge connected
                       </p>
                     )}
                   </div>
@@ -178,22 +201,34 @@ export function SiteManager({ sites, onUpdated }: Props) {
             className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
           />
         </div>
+        <input
+          value={sitemapUrl}
+          onChange={(e) => setSitemapUrl(e.target.value)}
+          placeholder="Sitemap URL (optional, e.g. https://example.com/sitemap.xml)"
+          className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+        />
         <div className="flex gap-2">
           <input
-            value={sitemapUrl}
-            onChange={(e) => setSitemapUrl(e.target.value)}
-            placeholder="Sitemap URL (optional, e.g. https://example.com/sitemap.xml)"
+            value={wpApiUrl}
+            onChange={(e) => setWpApiUrl(e.target.value)}
+            placeholder="WP API URL (optional, from SEO Bridge plugin)"
             className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
           />
-          <button
-            onClick={addSite}
-            disabled={adding || !name || !url}
-            className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-[var(--color-green)] hover:opacity-90 text-white rounded-lg transition-all disabled:opacity-50"
-          >
-            {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Add
-          </button>
+          <input
+            value={wpApiKey}
+            onChange={(e) => setWpApiKey(e.target.value)}
+            placeholder="WP API Key"
+            className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+          />
         </div>
+        <button
+          onClick={addSite}
+          disabled={adding || !name || !url}
+          className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-[var(--color-green)] hover:opacity-90 text-white rounded-lg transition-all disabled:opacity-50"
+        >
+          {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          Add Site
+        </button>
       </div>
     </div>
   );

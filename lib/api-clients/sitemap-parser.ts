@@ -23,8 +23,9 @@ export async function fetchSitemap(sitemapUrl: string): Promise<SitemapUrl[]> {
   }
 
   if (childSitemaps.length > 0) {
-    // Fetch first 3 child sitemaps to avoid too many requests
-    for (const childUrl of childSitemaps.slice(0, 3)) {
+    // Fetch ALL child sitemaps (not just first 3)
+    console.log(`[Sitemap] Found ${childSitemaps.length} child sitemaps`);
+    for (const childUrl of childSitemaps) {
       try {
         const childRes = await fetch(childUrl, {
           headers: { "User-Agent": "ShoumyaPortfolio/1.0" },
@@ -40,6 +41,7 @@ export async function fetchSitemap(sitemapUrl: string): Promise<SitemapUrl[]> {
     urls.push(...parseUrlsFromXml(xml));
   }
 
+  console.log(`[Sitemap] Total URLs parsed: ${urls.length}`);
   return urls;
 }
 
@@ -55,4 +57,23 @@ function parseUrlsFromXml(xml: string): SitemapUrl[] {
   }
 
   return urls;
+}
+
+/**
+ * Extract readable slug/title from URL path
+ * e.g. /sat-to-atar-conversion/ → "sat to atar conversion"
+ */
+export function urlToTitle(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    return pathname
+      .replace(/^\/|\/$/g, "")
+      .split("/")
+      .pop()!
+      .replace(/[-_]/g, " ")
+      .replace(/\.\w+$/, "")
+      .trim();
+  } catch {
+    return url;
+  }
 }

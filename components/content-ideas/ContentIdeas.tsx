@@ -30,7 +30,7 @@ export function ContentIdeasList({ ideas, blurred = false }: Props) {
     <div className="space-y-3">
       <div className="flex items-center gap-2 mb-4">
         <Calendar size={18} className="text-[var(--color-accent)]" />
-        <h3 className="text-lg font-semibold">7-Day Content Plan</h3>
+        <h3 className="text-lg font-semibold">Content Plan — Priority Ranked</h3>
         <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[var(--color-accent-glow)] text-[var(--color-accent)]">
           {ideas.length} articles
         </span>

@@ -23,6 +23,7 @@ export function AdminDashboard({ onLogout }: Props) {
   const [gsc, setGsc] = useState<KeywordData | null>(null);
   const [bing, setBing] = useState<KeywordData | null>(null);
   const [reddit, setReddit] = useState<TrendingTopic[]>([]);
+  const [wpPostCount, setWpPostCount] = useState<number | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -67,10 +68,11 @@ export function AdminDashboard({ onLogout }: Props) {
 
   const loadAll = useCallback(async (siteUrl: string) => {
     if (!siteUrl) return;
-    const [gscData, bingData, redditData] = await Promise.all([
+    const [gscData, bingData, redditData, wpData] = await Promise.all([
       fetchData("gsc", "gsc", siteUrl),
       fetchData("bing", "bing", siteUrl),
       fetchData("reddit", "reddit", siteUrl),
+      fetchData("wordpress", "wordpress", siteUrl),
     ]);
     if (gscData) setGsc(gscData);
     else setGsc(null);
@@ -78,6 +80,8 @@ export function AdminDashboard({ onLogout }: Props) {
     else setBing(null);
     if (redditData) setReddit(redditData);
     else setReddit([]);
+    if (wpData) setWpPostCount(wpData.content?.length || 0);
+    else setWpPostCount(null);
     setAnalysis(null);
   }, [fetchData]);
 
@@ -99,7 +103,7 @@ export function AdminDashboard({ onLogout }: Props) {
       const res = await fetch("/api/tools/content-ideas/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keywords: allKeywords, trendingTopics: reddit, siteUrl: selectedSite }),
+        body: JSON.stringify({ keywords: allKeywords, trendingTopics: reddit, siteUrl: selectedSite, force: true }),
       });
       if (!res.ok) throw new Error(`Analysis failed (${res.status})`);
       const json = await res.json();
@@ -138,6 +142,7 @@ export function AdminDashboard({ onLogout }: Props) {
     setGsc(null);
     setBing(null);
     setReddit([]);
+    setWpPostCount(null);
     setAnalysis(null);
     setErrors({});
   };
@@ -240,6 +245,7 @@ export function AdminDashboard({ onLogout }: Props) {
           (gsc ? 1 : 0) + (bing ? 1 : 0) +
           (reddit.some(t => t.source === "reddit") ? 1 : 0) +
           (reddit.some(t => t.source === "quora") ? 1 : 0) +
+          (wpPostCount !== null ? 1 : 0) +
           (analysis ? 1 : 0)
         }
       />
@@ -252,7 +258,14 @@ export function AdminDashboard({ onLogout }: Props) {
         </div>
       ) : allKeywords.length > 0 ? (
         <div>
-          <h3 className="text-lg font-semibold mb-3">Keywords ({allKeywords.length})</h3>
+          <div className="flex items-center gap-3 mb-3">
+            <h3 className="text-lg font-semibold">Keywords ({allKeywords.length})</h3>
+            {wpPostCount !== null && (
+              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-green-400/10 text-green-400 border border-green-400/20">
+                WP: {wpPostCount} posts connected
+              </span>
+            )}
+          </div>
           <KeywordTable keywords={allKeywords} />
         </div>
       ) : (

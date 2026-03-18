@@ -8,8 +8,9 @@ const TTL: Record<string, number> = {
   bing: 24 * 60 * 60 * 1000,
   reddit: 12 * 60 * 60 * 1000,
   quora: 12 * 60 * 60 * 1000,
-  analysis: 7 * 24 * 60 * 60 * 1000,
+  analysis: 24 * 60 * 60 * 1000,
   sitemap: 24 * 60 * 60 * 1000,
+  wordpress: 15 * 60 * 1000,
 };
 
 function ensureDir(dir: string) {
