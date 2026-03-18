@@ -33,6 +33,21 @@ export interface TrendingTopic {
   fetchedAt: string;
 }
 
+// ============ Page-Keyword Mapping (GSC) ============
+export interface PageKeywordEntry {
+  query: string;
+  impressions: number;
+  clicks: number;
+  position: number;
+}
+
+export interface PageKeywordMap {
+  url: string;
+  keywords: PageKeywordEntry[];
+  totalImpressions: number;
+  totalClicks: number;
+}
+
 // ============ Content Ideas (Claude output) ============
 export interface ContentIdea {
   title: string;
@@ -43,6 +58,8 @@ export interface ContentIdea {
   estimatedSearchVolume: string;
   day?: number;
   reason?: string;
+  action?: "new" | "optimize";
+  existingUrl?: string;
 }
 
 export interface TopicCluster {

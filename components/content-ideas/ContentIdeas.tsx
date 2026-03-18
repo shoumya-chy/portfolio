@@ -43,11 +43,19 @@ export function ContentIdeasList({ ideas, blurred = false }: Props) {
             className="group p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl hover:border-[var(--color-border-hover)] transition-all card-glow"
           >
             <div className="flex items-start gap-3">
-              {/* Day number */}
+              {/* Priority number */}
               {idea.day && (
-                <div className="shrink-0 w-12 h-12 rounded-lg bg-[var(--color-accent-glow)] flex flex-col items-center justify-center">
-                  <span className="text-lg font-bold text-[var(--color-accent)]">{idea.day}</span>
-                  <span className="text-[9px] uppercase text-[var(--color-text-dim)]">{dayLabels[idea.day] || ""}</span>
+                <div className={`shrink-0 w-12 h-12 rounded-lg flex flex-col items-center justify-center ${
+                  idea.action === "optimize"
+                    ? "bg-orange-400/10 border border-orange-400/20"
+                    : "bg-[var(--color-accent-glow)]"
+                }`}>
+                  <span className={`text-lg font-bold ${idea.action === "optimize" ? "text-orange-400" : "text-[var(--color-accent)]"}`}>
+                    {idea.day}
+                  </span>
+                  <span className={`text-[9px] uppercase font-bold ${idea.action === "optimize" ? "text-orange-400" : "text-green-400"}`}>
+                    {idea.action === "optimize" ? "FIX" : "NEW"}
+                  </span>
                 </div>
               )}
 
@@ -75,6 +83,14 @@ export function ContentIdeasList({ ideas, blurred = false }: Props) {
                 <p className={`text-sm text-[var(--color-text-muted)] mb-2 ${blurred ? "blur-sm select-none" : ""}`}>
                   {idea.description}
                 </p>
+
+                {/* Existing URL for optimize suggestions */}
+                {idea.action === "optimize" && idea.existingUrl && (
+                  <a href={idea.existingUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-block text-xs text-orange-400 hover:underline mb-1 font-mono truncate max-w-full">
+                    {idea.existingUrl}
+                  </a>
+                )}
 
                 {/* Reason / Priority explanation */}
                 {idea.reason && (

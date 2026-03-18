@@ -1,4 +1,4 @@
-import type { KeywordData, Keyword } from "@/lib/types";
+import type { KeywordData, Keyword, PageKeywordMap } from "@/lib/types";
 import { getGscCredentials } from "@/lib/config";
 
 async function getAccessToken(): Promise<string> {
@@ -134,4 +134,90 @@ export async function fetchGSCData(siteUrl: string): Promise<KeywordData> {
   console.log(`[GSC] Final: ${allKeywords.length} keywords, ${totalImpressions} impressions, ${totalClicks} clicks for ${fetchedSiteUrl}`);
 
   return { keywords: allKeywords, totalImpressions, totalClicks, avgPosition, fetchedAt: new Date().toISOString() };
+}
+
+/**
+ * Fetch keyword-to-page mapping from GSC.
+ * Returns which keywords each page ranks for.
+ */
+export async function fetchGSCPageKeywords(siteUrl: string): Promise<PageKeywordMap[]> {
+  if (!siteUrl) return [];
+
+  const accessToken = await getAccessToken();
+  const endDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const startDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  const siteUrlVariants = [
+    siteUrl,
+    siteUrl.endsWith("/") ? siteUrl.slice(0, -1) : siteUrl + "/",
+  ];
+
+  for (const tryUrl of siteUrlVariants) {
+    try {
+      const res = await fetch(
+        `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(tryUrl)}/searchAnalytics/query`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            startDate,
+            endDate,
+            dimensions: ["page", "query"],
+            rowLimit: 25000,
+            type: "web",
+          }),
+        }
+      );
+
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      const rows = data.rows || [];
+
+      // Group by page URL
+      const pageMap = new Map<string, PageKeywordMap>();
+
+      for (const row of rows) {
+        const pageUrl = row.keys[0];
+        const query = row.keys[1];
+
+        if (!pageMap.has(pageUrl)) {
+          pageMap.set(pageUrl, {
+            url: pageUrl,
+            keywords: [],
+            totalImpressions: 0,
+            totalClicks: 0,
+          });
+        }
+
+        const page = pageMap.get(pageUrl)!;
+        page.keywords.push({
+          query,
+          impressions: row.impressions,
+          clicks: row.clicks,
+          position: Math.round(row.position * 10) / 10,
+        });
+        page.totalImpressions += row.impressions;
+        page.totalClicks += row.clicks;
+      }
+
+      // Sort keywords within each page by impressions
+      for (const page of pageMap.values()) {
+        page.keywords.sort((a, b) => b.impressions - a.impressions);
+      }
+
+      const result = Array.from(pageMap.values())
+        .sort((a, b) => b.totalImpressions - a.totalImpressions);
+
+      console.log(`[GSC] Page-keyword map: ${result.length} pages with keywords`);
+      return result;
+    } catch {
+      continue;
+    }
+  }
+
+  return [];
 }
