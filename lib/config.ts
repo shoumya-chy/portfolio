@@ -49,12 +49,20 @@ const DEFAULT_CONFIG: AppConfig = {
 };
 
 export function readConfig(): AppConfig {
-  ensureConfigDir();
+  try {
+    ensureConfigDir();
+  } catch {
+    return DEFAULT_CONFIG;
+  }
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
     return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
   } catch {
-    writeConfig(DEFAULT_CONFIG);
+    try {
+      writeConfig(DEFAULT_CONFIG);
+    } catch {
+      // Read-only FS (e.g. serverless) — use defaults without persisting.
+    }
     return DEFAULT_CONFIG;
   }
 }
