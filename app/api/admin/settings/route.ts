@@ -13,6 +13,8 @@ export async function GET() {
     apiKeys: {
       anthropic: config.apiKeys.anthropic ? `...${config.apiKeys.anthropic.slice(-8)}` : "",
       bing: config.apiKeys.bing ? `...${config.apiKeys.bing.slice(-8)}` : "",
+      dataForSeoLogin: config.apiKeys.dataForSeoLogin ? `...${config.apiKeys.dataForSeoLogin.slice(-8)}` : "",
+      dataForSeoPassword: config.apiKeys.dataForSeoPassword ? "configured" : "",
     },
     gsc: { hasCredentials: !!config.gsc.credentialsJson },
     outreach: {
@@ -42,6 +44,14 @@ export async function PUT(req: Request) {
     // Update GSC credentials
     if (body.gscCredentialsJson !== undefined) {
       config.gsc.credentialsJson = body.gscCredentialsJson;
+    }
+
+    // Update DataForSEO credentials
+    if (body.dataForSeoLogin !== undefined) {
+      config.apiKeys.dataForSeoLogin = body.dataForSeoLogin;
+    }
+    if (body.dataForSeoPassword !== undefined) {
+      config.apiKeys.dataForSeoPassword = body.dataForSeoPassword;
     }
 
     // Update outreach settings

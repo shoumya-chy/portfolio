@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 const tools = [
   {
-    title: "Content Ideas Generator",
-    desc: "AI-powered tool that aggregates data from Google Search Console, Bing, Reddit, and Quora to generate strategic content ideas using Claude AI.",
+    title: "Topic Discovery",
+    desc: "Discovers new content topics by analyzing GSC keywords, Bing data, DataForSEO PAA questions, and Quora — scored, deduped against your WordPress posts, and clustered by Claude AI.",
     status: "Live",
     color: "var(--color-accent)",
     icon: Sparkles,

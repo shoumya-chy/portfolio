@@ -48,7 +48,65 @@ export interface PageKeywordMap {
   totalClicks: number;
 }
 
-// ============ Content Ideas (Claude output) ============
+// ============ DataForSEO PAA ============
+export interface PAAQuestion {
+  question: string;
+  seedKeyword: string;
+  fetchedAt: string;
+}
+
+export interface RelatedSearch {
+  query: string;
+  seedKeyword: string;
+  fetchedAt: string;
+}
+
+// ============ Topic Candidate (scoring pipeline) ============
+export interface TopicCandidate {
+  topic: string;
+  normalizedTopic: string;
+  score: number;
+  sources: string[];  // which data sources contributed: "gsc", "bing", "paa", "quora", "related"
+  gscImpressions: number;
+  gscPosition: number;
+  paaSource: boolean;
+  bingSignal: boolean;
+  quoraSignal: boolean;
+  wordCount: number;
+}
+
+// ============ Final Recommendation (Claude output) ============
+export interface TopicRecommendation {
+  topic: string;
+  cluster: string;
+  rationale: string;
+  score: number;
+  source: string;
+  action?: "new" | "optimize";
+  existingUrl?: string;
+}
+
+// ============ Pipeline Result ============
+export interface PipelineStats {
+  gscKeywords: number;
+  bingKeywords: number;
+  paaQuestions: number;
+  quoraTopics: number;
+  totalCandidates: number;
+  afterDedup: number;
+  afterExclusion: number;
+  finalRecommendations: number;
+  wpPostsChecked: number;
+}
+
+export interface DiscoveryResult {
+  recommendations: TopicRecommendation[];
+  stats: PipelineStats;
+  summary: string;
+  analyzedAt: string;
+}
+
+// ============ Legacy types (kept for backward compat) ============
 export interface ContentIdea {
   title: string;
   description: string;
@@ -60,6 +118,15 @@ export interface ContentIdea {
   reason?: string;
   action?: "new" | "optimize";
   existingUrl?: string;
+}
+
+export interface TrendingContentIdea {
+  title: string;
+  description: string;
+  sourceTopics: string[];
+  source: "reddit" | "quora" | "both";
+  relatedKeywords: string[];
+  difficulty: "low" | "medium" | "high";
 }
 
 export interface TopicCluster {
@@ -74,15 +141,6 @@ export interface ContentGap {
   description: string;
   keywords: string[];
   opportunity: "high" | "medium" | "low";
-}
-
-export interface TrendingContentIdea {
-  title: string;
-  description: string;
-  sourceTopics: string[];
-  source: "reddit" | "quora" | "both";
-  relatedKeywords: string[];
-  difficulty: "low" | "medium" | "high";
 }
 
 export interface AnalysisResult {

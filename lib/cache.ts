@@ -12,6 +12,7 @@ const TTL: Record<string, number> = {
   sitemap: 24 * 60 * 60 * 1000,
   wordpress: 15 * 60 * 1000,
   "gsc-pages": 24 * 60 * 60 * 1000,
+  discovery: 24 * 60 * 60 * 1000,
 };
 
 function ensureDir(dir: string) {

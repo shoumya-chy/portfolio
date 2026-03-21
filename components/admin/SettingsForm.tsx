@@ -5,7 +5,7 @@ import { Key, Shield, Save, Loader2, Eye, EyeOff, CheckCircle, Search } from "lu
 
 interface SettingsData {
   admin: { email: string; hasPassword: boolean };
-  apiKeys: { anthropic: string; bing: string };
+  apiKeys: { anthropic: string; bing: string; dataForSeoLogin?: string; dataForSeoPassword?: string };
   gsc: { hasCredentials: boolean };
   outreach?: { googleCSEId: string; googleCSEApiKey: string };
 }
@@ -21,6 +21,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
   const [gscJson, setGscJson] = useState("");
   const [googleCSEId, setGoogleCSEId] = useState("");
   const [googleCSEApiKey, setGoogleCSEApiKey] = useState("");
+  const [dfLogin, setDfLogin] = useState("");
+  const [dfPassword, setDfPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,6 +38,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
       if (gscJson) body.gscCredentialsJson = btoa(gscJson);
       if (googleCSEId) body.googleCSEId = googleCSEId;
       if (googleCSEApiKey) body.googleCSEApiKey = googleCSEApiKey;
+      if (dfLogin) body.dataForSeoLogin = dfLogin;
+      if (dfPassword) body.dataForSeoPassword = dfPassword;
       if (newPassword) body.newPassword = newPassword;
 
       const res = await fetch("/api/admin/settings", {
@@ -51,6 +55,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
       setGscJson("");
       setGoogleCSEId("");
       setGoogleCSEApiKey("");
+      setDfLogin("");
+      setDfPassword("");
       setNewPassword("");
       onSaved();
     } catch {
@@ -147,6 +153,30 @@ export function SettingsForm({ settings, onSaved }: Props) {
         </div>
       </div>
 
+      {/* DataForSEO */}
+      <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
+        <div className="flex items-center gap-2 mb-4">
+          <Search size={18} className="text-[var(--color-purple)]" />
+          <h3 className="font-semibold">DataForSEO (PAA & Related Searches)</h3>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-[var(--color-text-dim)] mb-1">
+              DataForSEO Login {settings.apiKeys.dataForSeoLogin && <span className="text-[var(--color-green)]">(configured)</span>}
+            </label>
+            <input type="text" value={dfLogin} onChange={(e) => setDfLogin(e.target.value)} placeholder="your@email.com"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]" />
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--color-text-dim)] mb-1">
+              DataForSEO Password {settings.apiKeys.dataForSeoPassword && <span className="text-[var(--color-green)]">(configured)</span>}
+            </label>
+            <input type="password" value={dfPassword} onChange={(e) => setDfPassword(e.target.value)} placeholder="DataForSEO API password"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]" />
+          </div>
+        </div>
+      </div>
+
       {/* Password */}
       <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
         <div className="flex items-center gap-2 mb-4">
@@ -181,7 +211,7 @@ export function SettingsForm({ settings, onSaved }: Props) {
       <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
-          disabled={saving || (!anthropicKey && !bingKey && !gscJson && !googleCSEId && !googleCSEApiKey && !newPassword)}
+          disabled={saving || (!anthropicKey && !bingKey && !gscJson && !googleCSEId && !googleCSEApiKey && !dfLogin && !dfPassword && !newPassword)}
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white rounded-lg transition-all disabled:opacity-50"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}

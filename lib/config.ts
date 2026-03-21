@@ -18,6 +18,8 @@ export interface AppConfig {
   apiKeys: {
     anthropic: string;
     bing: string;
+    dataForSeoLogin?: string;
+    dataForSeoPassword?: string;
   };
   gsc: {
     credentialsJson: string;
@@ -62,8 +64,8 @@ export function writeConfig(config: AppConfig): void {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
 }
 
-export function getApiKey(key: "anthropic" | "bing"): string {
-  return readConfig().apiKeys[key] || "";
+export function getApiKey(key: "anthropic" | "bing" | "dataForSeoLogin" | "dataForSeoPassword"): string {
+  return readConfig().apiKeys[key as keyof AppConfig["apiKeys"]] || "";
 }
 
 export function getGscCredentials(): string {
