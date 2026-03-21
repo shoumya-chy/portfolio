@@ -33,9 +33,12 @@ export async function GET(request: Request) {
         const findResult = await findNewProspects(project);
         summary.sitesFound += findResult.prospects.length;
 
-        // 2. Send outreach batch
-        const emailResult = await sendOutreachBatch(project);
-        summary.emailsSent += emailResult.sent || 0;
+        // 2. Send outreach emails (1 at a time, loop until weekly quota is done)
+        for (let round = 0; round < 20; round++) {
+          const emailResult = await sendOutreachBatch(project);
+          summary.emailsSent += emailResult.sent || 0;
+          if (emailResult.sent === 0) break;
+        }
 
         // 3. Poll for replies
         const repliesResult = await pollForReplies(project);

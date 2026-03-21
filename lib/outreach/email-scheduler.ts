@@ -40,7 +40,8 @@ export async function sendOutreachBatch(
       .filter(p => p.contactEmail)
       .sort((a, b) => (b.domainAuthority || 0) - (a.domainAuthority || 0));
 
-    const batch = prospects.slice(0, remainingQuota);
+    // Send 1 email per request — never times out. Click multiple times or cron loops.
+    const batch = prospects.slice(0, 1);
 
     for (const prospect of batch) {
       try {
