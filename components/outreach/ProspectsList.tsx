@@ -108,6 +108,12 @@ export function ProspectsList({ prospects, projectId, onRefresh }: Props) {
                   <p className={`text-xs font-mono truncate ${prospect.contactEmail ? "text-[var(--color-text-dim)]" : "text-orange-400"}`}>
                     {prospect.contactEmail || "No email found — check site manually"}
                   </p>
+                  {prospect.matchedPostTitle && (
+                    <p className="text-xs text-[var(--color-accent)] mt-1 truncate">
+                      Linking to: {prospect.matchedPostTitle}
+                      {prospect.anchorStrategy && <span className="text-[var(--color-text-dim)]"> ({prospect.anchorStrategy})</span>}
+                    </p>
+                  )}
                   {prospect.lastEmailSentAt && (
                     <p className="text-xs text-[var(--color-text-dim)] mt-1">
                       Last activity:{" "}

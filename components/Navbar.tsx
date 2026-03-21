@@ -62,7 +62,7 @@ export function Navbar() {
             className="flex items-center hover:opacity-80 transition-opacity"
           >
             <Image
-              src="/logo.webp"
+              src="/logo.webp?v=2"
               alt="Shoumya Chowdhury"
               width={120}
               height={120}

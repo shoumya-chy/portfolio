@@ -326,32 +326,45 @@ export function OutreachDashboard({ onLogout }: Props) {
         </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Pipeline Funnel */}
       {stats && selectedProjectId && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+        <div className="space-y-3">
+          {/* Funnel visualization */}
           <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
-            <div className="text-xs text-[var(--color-text-dim)] mb-1">Found</div>
-            <div className="text-2xl font-bold">{stats.totalFound}</div>
-          </div>
-          <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
-            <div className="text-xs text-[var(--color-text-dim)] mb-1">Emailed</div>
-            <div className="text-2xl font-bold">{stats.emailed}</div>
-          </div>
-          <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
-            <div className="text-xs text-[var(--color-text-dim)] mb-1">Replied</div>
-            <div className="text-2xl font-bold">{stats.replied}</div>
-          </div>
-          <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
-            <div className="text-xs text-[var(--color-text-dim)] mb-1">Agreed</div>
-            <div className="text-2xl font-bold">{stats.agreed}</div>
-          </div>
-          <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
-            <div className="text-xs text-[var(--color-text-dim)] mb-1">Content Sent</div>
-            <div className="text-2xl font-bold">{stats.contentSent}</div>
-          </div>
-          <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
-            <div className="text-xs text-[var(--color-text-dim)] mb-1">Rejected</div>
-            <div className="text-2xl font-bold">{stats.rejected}</div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[var(--color-text-dim)]">Outreach Pipeline</h3>
+              <div className="flex items-center gap-2 text-xs text-[var(--color-text-dim)]">
+                <span>This week: {stats.emailsSentThisWeek}/{currentProject?.emailsPerWeek || 20} emails</span>
+                {stats.lastRunAt && <span>• Last: {new Date(stats.lastRunAt).toLocaleDateString()}</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              {[
+                { label: "Found", value: stats.totalFound, color: "bg-blue-400" },
+                { label: "Emailed", value: stats.emailed, color: "bg-[var(--color-orange)]" },
+                { label: "Replied", value: stats.replied, color: "bg-purple-400" },
+                { label: "Agreed", value: stats.agreed, color: "bg-[var(--color-green)]" },
+                { label: "Content Sent", value: stats.contentSent, color: "bg-[var(--color-accent)]" },
+              ].map((step, i) => (
+                <div key={step.label} className="flex items-center gap-1 flex-1">
+                  <div className="flex-1 text-center">
+                    <div className={`${step.color} text-white rounded py-2 px-1 font-bold text-lg`}>
+                      {step.value}
+                    </div>
+                    <div className="mt-1 text-[var(--color-text-dim)] truncate">{step.label}</div>
+                  </div>
+                  {i < 4 && <span className="text-[var(--color-text-dim)] shrink-0">→</span>}
+                </div>
+              ))}
+              {stats.rejected > 0 && (
+                <div className="flex-1 text-center">
+                  <div className="bg-red-400/20 text-red-400 rounded py-2 px-1 font-bold text-lg">
+                    {stats.rejected}
+                  </div>
+                  <div className="mt-1 text-red-400/60 truncate">Rejected</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
