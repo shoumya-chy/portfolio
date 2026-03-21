@@ -171,9 +171,10 @@ export function logBacklink(projectId: string, url: string): void {
 
 function getWeekStart(): string {
   const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(now.setDate(diff));
+  const monday = new Date(now);
+  const day = monday.getDay();
+  const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+  monday.setDate(diff);
   monday.setHours(0, 0, 0, 0);
   return monday.toISOString();
 }

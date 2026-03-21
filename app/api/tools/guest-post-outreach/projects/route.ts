@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthFromCookies } from "@/lib/auth";
 import {
   listProjects,
+  getProject,
   saveProject,
   deleteProject,
 } from "@/lib/outreach/storage";
@@ -84,7 +85,6 @@ export async function PUT(request: Request) {
     const { id } = body;
     if (!id) return NextResponse.json({ error: "Project id required" }, { status: 400 });
 
-    const { getProject } = await import("@/lib/outreach/storage");
     const existing = getProject(id);
     if (!existing) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 

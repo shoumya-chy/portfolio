@@ -86,8 +86,15 @@ export function ProspectsList({ prospects, projectId, onRefresh }: Props) {
                 className="flex items-center justify-between gap-4 p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-lg hover:border-[var(--color-border-hover)] transition-colors"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <p className="font-mono text-sm text-[var(--color-text)] truncate">{prospect.targetDomain}</p>
+                    {prospect.domainAuthority ? (
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        prospect.domainAuthority >= 40 ? "bg-green-400/10 text-green-400" :
+                        prospect.domainAuthority >= 25 ? "bg-blue-400/10 text-blue-400" :
+                        "bg-[var(--color-bg)] text-[var(--color-text-dim)]"
+                      }`}>DA {prospect.domainAuthority}</span>
+                    ) : null}
                     <span
                       className="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap"
                       style={{

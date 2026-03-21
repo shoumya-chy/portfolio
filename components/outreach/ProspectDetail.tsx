@@ -54,6 +54,19 @@ export function ProspectDetail({ prospect, projectId, onClose }: Props) {
               </span>
             </div>
             <p className="text-sm text-[var(--color-text-dim)] font-mono">{prospect.contactEmail}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {prospect.domainAuthority ? (
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  prospect.domainAuthority >= 40 ? "bg-green-400/10 text-green-400" : "bg-blue-400/10 text-blue-400"
+                }`}>DA {prospect.domainAuthority}</span>
+              ) : null}
+              {prospect.matchedPostTitle && (
+                <span className="text-xs text-[var(--color-accent)]">Target: {prospect.matchedPostTitle}</span>
+              )}
+              {prospect.anchorStrategy && (
+                <span className="text-xs text-[var(--color-text-dim)]">Anchor: {prospect.anchorStrategy}</span>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}

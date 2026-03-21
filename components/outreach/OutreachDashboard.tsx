@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, LogOut, Loader2, AlertCircle, ChevronDown, Zap, Mail, CheckCircle2, Plus, Pencil } from "lucide-react";
+import { RefreshCw, LogOut, Loader2, AlertCircle, ChevronDown, Zap, Mail, CheckCircle2, Plus, Pencil, Target } from "lucide-react";
 import { ProspectsList } from "./ProspectsList";
 import { ProjectManager } from "./ProjectManager";
-import type { OutreachProject, OutreachProspect, OutreachStats } from "@/lib/outreach/types";
+import type { OutreachProject, OutreachProspect, OutreachStats, BacklinkTarget } from "@/lib/outreach/types";
 
 interface Props {
   onLogout: () => void;
@@ -19,6 +19,7 @@ export function OutreachDashboard({ onLogout }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [editingProject, setEditingProject] = useState<OutreachProject | null>(null);
+  const [backlinkTargets, setBacklinkTargets] = useState<BacklinkTarget[]>([]);
 
   const setLoadingKey = (key: string, val: boolean) =>
     setLoading((p) => ({ ...p, [key]: val }));
@@ -67,6 +68,16 @@ export function OutreachDashboard({ onLogout }: Props) {
         setErrorKey("prospects", err instanceof Error ? err.message : "Failed to fetch data");
       })
       .finally(() => setLoadingKey("prospects", false));
+
+    // Also fetch backlink targets
+    fetch("/api/tools/guest-post-outreach/backlink-targets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: selectedProjectId }),
+    })
+      .then(r => r.json())
+      .then(d => setBacklinkTargets(d.targets || []))
+      .catch(() => setBacklinkTargets([]));
   }, [selectedProjectId]);
 
   const [successMsg, setSuccessMsg] = useState<string>("");
@@ -341,6 +352,52 @@ export function OutreachDashboard({ onLogout }: Props) {
           <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
             <div className="text-xs text-[var(--color-text-dim)] mb-1">Rejected</div>
             <div className="text-2xl font-bold">{stats.rejected}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Backlink Priority Targets */}
+      {backlinkTargets.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Target size={16} className="text-[var(--color-accent)]" />
+            <h3 className="text-sm font-semibold">Posts Needing Backlinks (Priority Order)</h3>
+            <span className="text-xs font-mono text-[var(--color-text-dim)]">{backlinkTargets.length} targets</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[var(--color-text-dim)] border-b border-[var(--color-border)]">
+                  <th className="text-left py-2 px-2">#</th>
+                  <th className="text-left py-2 px-2">Post</th>
+                  <th className="text-right py-2 px-2">Impressions</th>
+                  <th className="text-right py-2 px-2">Position</th>
+                  <th className="text-right py-2 px-2">Score</th>
+                  <th className="text-center py-2 px-2">Priority</th>
+                </tr>
+              </thead>
+              <tbody>
+                {backlinkTargets.slice(0, 10).map((t, i) => (
+                  <tr key={i} className="border-b border-[var(--color-border)]/30 hover:bg-[var(--color-bg-card)]">
+                    <td className="py-2 px-2 text-[var(--color-text-dim)]">{i + 1}</td>
+                    <td className="py-2 px-2">
+                      <div className="font-medium truncate max-w-[200px] sm:max-w-[300px]">{t.title}</div>
+                      {t.focusKeyword && <div className="text-[var(--color-text-dim)] truncate">{t.focusKeyword}</div>}
+                    </td>
+                    <td className="py-2 px-2 text-right font-mono">{t.impressions.toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right font-mono">{t.position}</td>
+                    <td className="py-2 px-2 text-right font-mono font-bold text-[var(--color-accent)]">{t.score}</td>
+                    <td className="py-2 px-2 text-center">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        t.priority === "high" ? "bg-red-400/10 text-red-400" :
+                        t.priority === "medium" ? "bg-orange-400/10 text-orange-400" :
+                        "bg-green-400/10 text-green-400"
+                      }`}>{t.priority.toUpperCase()}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

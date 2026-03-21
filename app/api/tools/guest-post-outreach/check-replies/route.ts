@@ -32,9 +32,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to check replies" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Failed to check replies";
+    console.log("[CheckReplies] Error:", msg);
+    return NextResponse.json({ error: msg, processed: 0 }, { status: 500 });
   }
 }

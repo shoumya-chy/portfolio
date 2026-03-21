@@ -63,6 +63,16 @@ export interface OutreachProspect {
   contentSentAt?: string;
   outboundEmails: EmailRecord[];
   inboundEmails: InboundEmail[];
+  // Phase 1 enhancements
+  domainAuthority?: number;
+  siteNiche?: string;
+  guidelinesSnippet?: string;
+  // Phase 2 enhancements
+  matchedPostUrl?: string;
+  matchedPostTitle?: string;
+  anchorText?: string;
+  anchorStrategy?: "partial-match" | "natural" | "branded";
+  pitchedTopics?: string[];
 }
 
 export interface BacklinkTarget {
@@ -74,6 +84,9 @@ export interface BacklinkTarget {
   score: number;
   backlinkCount: number;
   priority: "high" | "medium" | "low";
+  trafficPotential?: number;
+  focusKeyword?: string;
+  wordCount?: number;
 }
 
 export interface GeneratedGuestPost {

@@ -8,7 +8,14 @@ export async function generateGuestPost(
   targetSiteStyle: string,
   senderSite: string,
   backlinkTargets: BacklinkTarget[],
-  guidelines?: string
+  extraContext?: {
+    guidelines?: string;
+    matchedPostTitle?: string;
+    matchedPostUrl?: string;
+    matchedPostContent?: string;
+    anchorText?: string;
+    anchorStrategy?: string;
+  }
 ): Promise<GeneratedGuestPost> {
   const apiKey = getApiKey("anthropic");
   if (!apiKey) throw new Error("Anthropic API key not configured");
@@ -20,9 +27,12 @@ export async function generateGuestPost(
     .sort((a, b) => b.score - a.score)
     .slice(0, 2);
 
-  const backlinkInstructions = selectedBacklinks.map((bl, i) =>
-    `Backlink ${i + 1}: Link to "${bl.url}" with natural anchor text related to the page topic`
-  ).join("\n");
+  // Use Phase 2 anchor strategy if available, otherwise default
+  const backlinkInstructions = extraContext?.matchedPostUrl
+    ? `PRIMARY BACKLINK: Link to "${extraContext.matchedPostUrl}" (article: "${extraContext.matchedPostTitle || ""}") using anchor text: "${extraContext.anchorText || "relevant contextual phrase"}". Strategy: ${extraContext.anchorStrategy || "natural"}. The link must feel genuinely useful to the reader.${extraContext.matchedPostContent ? `\n\nAbout the linked article:\n${extraContext.matchedPostContent.slice(0, 500)}` : ""}`
+    : selectedBacklinks.map((bl, i) =>
+        `Backlink ${i + 1}: Link to "${bl.url}" with natural anchor text related to "${bl.title}"`
+      ).join("\n");
 
   const nicheContext = niche ? `in the ${niche} niche` : "(multi-niche site — match the target site's topic area)";
   const prompt = `You are a seasoned freelance writer who writes for real blogs and publications. You've been hired to write a guest post for "${targetDomain}" ${nicheContext}. You are a real human being — you write from personal experience, real-world observations, and your own unique perspective.
@@ -68,7 +78,7 @@ ${targetSiteStyle.slice(0, 2000)}
 - Practical, with tips that come from experience not textbooks
 - Use H2 subheadings to break up the content
 - Write something their readers would actually bookmark
-${guidelines ? `\n## Site-Specific Guidelines:\n${guidelines}` : ""}
+${extraContext?.guidelines ? `\n## Site-Specific Guidelines:\n${extraContext.guidelines}` : ""}
 
 ## Backlinks to Include (weave seamlessly):
 ${backlinkInstructions}
