@@ -66,7 +66,7 @@ export async function runDiscoveryPipeline(siteUrl: string): Promise<DiscoveryRe
   const seedKeywords = gscKeywords
     .filter(k => k.impressions >= 10 && k.position >= 5 && k.position <= 30)
     .sort((a, b) => b.impressions - a.impressions)
-    .slice(0, 30)
+    .slice(0, 15)
     .map(k => k.query);
 
   console.log(`[Discovery] Sending ${seedKeywords.length} seed keywords to DataForSEO`);

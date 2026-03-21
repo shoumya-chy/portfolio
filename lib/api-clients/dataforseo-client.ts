@@ -4,15 +4,10 @@ import type { PAAQuestion, RelatedSearch } from "@/lib/types";
 
 const DATAFORSEO_API = "https://api.dataforseo.com/v3";
 
-interface DataForSEOTask {
-  id: string;
-  keyword: string;
-}
-
 /**
  * Fetch People Also Ask questions and Related Searches from DataForSEO.
- * Uses Standard Queue (POST task → GET results) for cost efficiency.
- * Caches results for 7 days per seed keyword.
+ * Uses batch posting (all keywords in one request) + single results fetch.
+ * Caches results per keyword for 7 days.
  */
 export async function fetchPAAAndRelated(
   seedKeywords: string[],
@@ -35,125 +30,140 @@ export async function fetchPAAAndRelated(
   const allPAA: PAAQuestion[] = [];
   const allRelated: RelatedSearch[] = [];
 
-  // Process top 30 seed keywords (cost control)
-  const keywords = seedKeywords.slice(0, 30);
+  // Limit to top 15 keywords (cost + speed control)
+  const keywords = seedKeywords.slice(0, 15);
 
+  // Separate cached vs uncached
+  const uncachedKeywords: string[] = [];
   for (const keyword of keywords) {
-    // Check cache first (7 day TTL)
     const cacheKey = `paa-${keyword.replace(/\s+/g, "-").toLowerCase()}`;
     const cached = getCache<{ paa: PAAQuestion[]; related: RelatedSearch[] }>(cacheKey);
     if (cached) {
       allPAA.push(...cached.paa);
       allRelated.push(...cached.related);
-      continue;
+    } else {
+      uncachedKeywords.push(keyword);
+    }
+  }
+
+  if (uncachedKeywords.length === 0) {
+    console.log(`[DataForSEO] All ${keywords.length} keywords cached`);
+    return { paaQuestions: allPAA, relatedSearches: allRelated };
+  }
+
+  console.log(`[DataForSEO] ${keywords.length - uncachedKeywords.length} cached, ${uncachedKeywords.length} to fetch`);
+
+  try {
+    // Batch post ALL uncached keywords in one API call
+    const tasks = uncachedKeywords.map(keyword => ({
+      keyword,
+      location_code: locationCode,
+      language_code: "en",
+      device: "desktop",
+      depth: 10,
+      people_also_ask_click_depth: 2,
+      tag: keyword, // Use tag to identify which keyword each result belongs to
+    }));
+
+    const postRes = await fetch(`${DATAFORSEO_API}/serp/google/organic/task_post`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(tasks),
+    });
+
+    if (!postRes.ok) {
+      const err = await postRes.text();
+      console.log(`[DataForSEO] Batch post failed: ${postRes.status} - ${err.substring(0, 200)}`);
+      return { paaQuestions: allPAA, relatedSearches: allRelated };
     }
 
-    try {
-      // Post task to Standard Queue
-      const postRes = await fetch(`${DATAFORSEO_API}/serp/google/organic/task_post`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify([{
-          keyword,
-          location_code: locationCode,
-          language_code: "en",
-          device: "desktop",
-          depth: 10,
-          people_also_ask_click_depth: 3,
-        }]),
-      });
+    const postData = await postRes.json();
+    const taskIds: { id: string; keyword: string }[] = [];
+    for (const task of postData.tasks || []) {
+      if (task.id) {
+        taskIds.push({ id: task.id, keyword: task.data?.keyword || task.data?.tag || "" });
+      }
+    }
 
-      if (!postRes.ok) {
-        console.log(`[DataForSEO] Task post failed for "${keyword}": ${postRes.status}`);
+    console.log(`[DataForSEO] Posted ${taskIds.length} tasks, waiting for results...`);
+
+    // Wait for tasks to complete (poll every 10 seconds, max 60 seconds)
+    await new Promise(r => setTimeout(r, 15000)); // Initial wait
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      // Fetch all completed tasks at once
+      const getRes = await fetch(`${DATAFORSEO_API}/serp/google/organic/tasks_ready`, { headers });
+      if (!getRes.ok) {
+        await new Promise(r => setTimeout(r, 10000));
         continue;
       }
 
-      const postData = await postRes.json();
-      const taskId = postData.tasks?.[0]?.id;
-      if (!taskId) continue;
+      const readyData = await getRes.json();
+      const readyIds = new Set((readyData.tasks?.[0]?.result || []).map((r: { id: string }) => r.id));
 
-      // Wait for task to complete (poll every 5 seconds, max 30 seconds)
-      let resultData = null;
-      for (let attempt = 0; attempt < 6; attempt++) {
-        await new Promise(r => setTimeout(r, 5000));
-
-        const getRes = await fetch(`${DATAFORSEO_API}/serp/google/organic/task_get/advanced/${taskId}`, {
-          headers,
-        });
-
-        if (!getRes.ok) continue;
-        const getData = await getRes.json();
-
-        if (getData.tasks?.[0]?.status_code === 20000) {
-          resultData = getData.tasks[0].result?.[0];
-          break;
-        }
-      }
-
-      if (!resultData) {
-        console.log(`[DataForSEO] Task timed out for "${keyword}"`);
+      const pendingTasks = taskIds.filter(t => !readyIds.has(t.id));
+      if (pendingTasks.length > 0 && attempt < 4) {
+        console.log(`[DataForSEO] ${taskIds.length - pendingTasks.length}/${taskIds.length} ready, waiting...`);
+        await new Promise(r => setTimeout(r, 10000));
         continue;
       }
 
-      // Extract PAA questions
-      const paa: PAAQuestion[] = [];
-      const items = resultData.items || [];
-      for (const item of items) {
-        if (item.type === "people_also_ask") {
-          const questions = item.items || [];
-          for (const q of questions) {
-            if (q.title) {
-              paa.push({
-                question: q.title,
-                seedKeyword: keyword,
-                fetchedAt: new Date().toISOString(),
-              });
+      // Fetch results for ready tasks
+      for (const task of taskIds) {
+        if (!readyIds.has(task.id)) continue;
+
+        try {
+          const resultRes = await fetch(
+            `${DATAFORSEO_API}/serp/google/organic/task_get/advanced/${task.id}`,
+            { headers }
+          );
+          if (!resultRes.ok) continue;
+
+          const resultData = await resultRes.json();
+          const items = resultData.tasks?.[0]?.result?.[0]?.items || [];
+
+          const paa: PAAQuestion[] = [];
+          const related: RelatedSearch[] = [];
+
+          for (const item of items) {
+            if (item.type === "people_also_ask") {
+              for (const q of item.items || []) {
+                if (q.title) {
+                  paa.push({ question: q.title, seedKeyword: task.keyword, fetchedAt: new Date().toISOString() });
+                }
+                for (const nested of q.items || []) {
+                  if (nested.title) {
+                    paa.push({ question: nested.title, seedKeyword: task.keyword, fetchedAt: new Date().toISOString() });
+                  }
+                }
+              }
             }
-            // Nested PAA (click depth)
-            if (q.items) {
-              for (const nested of q.items) {
-                if (nested.title) {
-                  paa.push({
-                    question: nested.title,
-                    seedKeyword: keyword,
-                    fetchedAt: new Date().toISOString(),
-                  });
+            if (item.type === "related_searches") {
+              for (const s of item.items || []) {
+                if (s.title) {
+                  related.push({ query: s.title, seedKeyword: task.keyword, fetchedAt: new Date().toISOString() });
                 }
               }
             }
           }
+
+          // Cache per keyword
+          const cacheKey = `paa-${task.keyword.replace(/\s+/g, "-").toLowerCase()}`;
+          setCache(cacheKey, { paa, related });
+
+          allPAA.push(...paa);
+          allRelated.push(...related);
+        } catch (err) {
+          console.log(`[DataForSEO] Result fetch error for "${task.keyword}":`, err instanceof Error ? err.message : err);
         }
       }
 
-      // Extract Related Searches
-      const related: RelatedSearch[] = [];
-      for (const item of items) {
-        if (item.type === "related_searches") {
-          const searches = item.items || [];
-          for (const s of searches) {
-            if (s.title) {
-              related.push({
-                query: s.title,
-                seedKeyword: keyword,
-                fetchedAt: new Date().toISOString(),
-              });
-            }
-          }
-        }
-      }
-
-      console.log(`[DataForSEO] "${keyword}": ${paa.length} PAA, ${related.length} related`);
-
-      // Cache for 7 days
-      setCache(cacheKey, { paa, related });
-
-      allPAA.push(...paa);
-      allRelated.push(...related);
-    } catch (err) {
-      console.log(`[DataForSEO] Error for "${keyword}":`, err instanceof Error ? err.message : err);
+      break; // Done fetching
     }
+  } catch (err) {
+    console.log(`[DataForSEO] Error:`, err instanceof Error ? err.message : err);
   }
 
-  console.log(`[DataForSEO] Total: ${allPAA.length} PAA questions, ${allRelated.length} related searches`);
+  console.log(`[DataForSEO] Total: ${allPAA.length} PAA, ${allRelated.length} related`);
   return { paaQuestions: allPAA, relatedSearches: allRelated };
 }

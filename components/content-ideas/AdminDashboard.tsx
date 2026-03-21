@@ -85,12 +85,32 @@ export function AdminDashboard({ onLogout }: Props) {
     if (wpData) setWpPostCount(wpData.content?.length || 0); else setWpPostCount(null);
   }, [fetchData]);
 
+  // Load cached discovery results only — instant, never triggers pipeline
+  const loadCachedDiscovery = useCallback(async (siteUrl: string) => {
+    if (!siteUrl) return;
+    try {
+      const res = await fetch("/api/tools/content-ideas/discover-cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteUrl }),
+      });
+      const json = await res.json();
+      if (res.ok && json.data?.recommendations?.length > 0) {
+        setDiscovery(json.data);
+      } else {
+        setDiscovery(null);
+      }
+    } catch {
+      setDiscovery(null);
+    }
+  }, []);
+
   useEffect(() => {
     if (selectedSite) {
       loadKeywords(selectedSite);
-      setDiscovery(null);
+      loadCachedDiscovery(selectedSite);
     }
-  }, [selectedSite, loadKeywords]);
+  }, [selectedSite, loadKeywords, loadCachedDiscovery]);
 
   const runDiscovery = async () => {
     if (!selectedSite) return;
