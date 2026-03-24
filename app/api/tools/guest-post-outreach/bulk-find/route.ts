@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthFromCookies } from "@/lib/auth";
-import { getProject } from "@/lib/outreach/storage";
-import { sendOutreachBatch } from "@/lib/outreach/email-scheduler";
-import { startJob, completeJob, failJob, isJobRunning } from "@/lib/outreach/job-runner";
+import { getProject, recalculateStats } from "@/lib/outreach/storage";
+import { bulkFindProspects } from "@/lib/outreach/prospect-finder";
+import { startJob, completeJob, failJob, isJobRunning, logJob } from "@/lib/outreach/job-runner";
 
 export async function POST(request: Request) {
   const isAdmin = await getAuthFromCookies();
@@ -28,25 +28,23 @@ export async function POST(request: Request) {
     }
 
     // Start job and return immediately
-    const job = startJob(projectId, "send-emails", "Starting email batch...");
+    const job = startJob(projectId, "bulk-find", "Starting bulk search...");
     if (!job) {
       return NextResponse.json({ error: "Failed to start job" }, { status: 500 });
     }
 
-    // Fire and forget — runs in background
+    // Fire and forget — runs in background after response is sent
     void (async () => {
       try {
-        const result = await sendOutreachBatch(project);
-        if (result.errors.length > 0 && result.sent === 0) {
-          failJob(projectId, result.errors.join("; "));
-        } else if (result.skipped && result.sent === 0) {
-          completeJob(projectId, { sent: 0, skipped: result.skipped }, result.skipped);
-        } else {
-          completeJob(projectId, {
-            sent: result.sent,
-            errors: result.errors,
-          }, `Sent ${result.sent} email${result.sent !== 1 ? "s" : ""}!${result.errors.length > 0 ? ` (${result.errors.length} failed)` : ""}`);
-        }
+        const result = await bulkFindProspects(project, (msg) => {
+          logJob(projectId, msg);
+        });
+        recalculateStats(projectId);
+        completeJob(projectId, {
+          total: result.total,
+          withEmail: result.withEmail,
+          debug: result.debug,
+        }, `Bulk search complete: ${result.total} prospects found, ${result.withEmail} with emails`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         failJob(projectId, msg);
@@ -55,7 +53,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ started: true, jobId: job.jobId });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

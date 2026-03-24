@@ -92,12 +92,19 @@ export function saveProspectsBatch(projectId: string, prospects: OutreachProspec
 export function getStats(projectId: string): OutreachStats {
   const filePath = path.join(projectDir(projectId), "stats.json");
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    const stats = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    // Ensure new fields exist
+    if (!stats.todayDate) stats.todayDate = getTodayDate();
+    if (stats.emailsSentToday === undefined) stats.emailsSentToday = 0;
+    if (stats.pendingWithEmail === undefined) stats.pendingWithEmail = 0;
+    return stats;
   } catch {
     return {
       totalFound: 0, emailed: 0, replied: 0, agreed: 0,
       contentSent: 0, rejected: 0, noResponse: 0,
       emailsSentThisWeek: 0, weekStart: getWeekStart(),
+      emailsSentToday: 0, todayDate: getTodayDate(),
+      pendingWithEmail: 0,
       lastRunAt: new Date().toISOString(),
     };
   }
@@ -111,10 +118,18 @@ export function saveStats(projectId: string, stats: OutreachStats): void {
 export function recalculateStats(projectId: string): OutreachStats {
   const prospects = listProspects(projectId);
   const weekStart = getWeekStart();
+  const todayDate = getTodayDate();
   const emailsSentThisWeek = prospects.filter(
     p => p.lastEmailSentAt && p.lastEmailSentAt >= weekStart
   ).length;
+  const emailsSentToday = prospects.filter(
+    p => p.lastEmailSentAt && p.lastEmailSentAt.startsWith(todayDate)
+  ).length;
+  const pendingWithEmail = prospects.filter(
+    p => p.state === "found" && p.contactEmail
+  ).length;
 
+  const oldStats = getStats(projectId);
   const stats: OutreachStats = {
     totalFound: prospects.length,
     emailed: prospects.filter(p => ["emailed", "replied", "agreed", "content_sent"].includes(p.state)).length,
@@ -125,7 +140,11 @@ export function recalculateStats(projectId: string): OutreachStats {
     noResponse: prospects.filter(p => p.state === "no_response").length,
     emailsSentThisWeek,
     weekStart,
+    emailsSentToday,
+    todayDate,
+    pendingWithEmail,
     lastRunAt: new Date().toISOString(),
+    lastDailyRunAt: oldStats.lastDailyRunAt,
   };
   saveStats(projectId, stats);
   return stats;
@@ -167,6 +186,49 @@ export function logBacklink(projectId: string, url: string): void {
   fs.writeFileSync(filePath, JSON.stringify(log, null, 2), "utf-8");
 }
 
+// ============ Cleanup ============
+
+/**
+ * Purge useless prospects from storage:
+ * - No email (can never be contacted)
+ * - Rejected (said no — don't keep them)
+ * - No response after all follow-ups exhausted
+ *
+ * Returns count of removed prospects.
+ */
+export function purgeDeadProspects(projectId: string): number {
+  const filePath = path.join(projectDir(projectId), "prospects.json");
+  const all = listProspects(projectId);
+  const before = all.length;
+
+  const kept = all.filter(p => {
+    // Remove: no email and never emailed
+    if (!p.contactEmail && p.state === "found") return false;
+    // Remove: rejected
+    if (p.state === "rejected") return false;
+    // Keep everything else (emailed, replied, agreed, content_sent, no_response with email)
+    return true;
+  });
+
+  if (kept.length < before) {
+    fs.writeFileSync(filePath, JSON.stringify(kept, null, 2), "utf-8");
+  }
+
+  return before - kept.length;
+}
+
+/**
+ * Remove a single prospect by ID.
+ */
+export function removeProspect(projectId: string, prospectId: string): boolean {
+  const filePath = path.join(projectDir(projectId), "prospects.json");
+  const all = listProspects(projectId);
+  const filtered = all.filter(p => p.id !== prospectId);
+  if (filtered.length === all.length) return false;
+  fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2), "utf-8");
+  return true;
+}
+
 // ============ Helpers ============
 
 function getWeekStart(): string {
@@ -178,3 +240,9 @@ function getWeekStart(): string {
   monday.setHours(0, 0, 0, 0);
   return monday.toISOString();
 }
+
+function getTodayDate(): string {
+  return new Date().toISOString().split("T")[0]; // "2026-03-25"
+}
+
+export { getTodayDate };

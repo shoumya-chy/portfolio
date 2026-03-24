@@ -1,17 +1,16 @@
-import { fetchGSCData, fetchGSCPageKeywords } from "@/lib/api-clients/gsc-client";
-import { fetchWordPressData } from "@/lib/api-clients/wordpress-client";
 import { getBacklinkLog } from "@/lib/outreach/storage";
 import { getApiKey } from "@/lib/config";
 import { getCache, setCache } from "@/lib/cache";
+import { getCachedGSCPages, getCachedWordPressData } from "@/lib/outreach/seo-data";
 import type { BacklinkTarget } from "@/lib/outreach/types";
-import type { PageKeywordMap } from "@/lib/types";
 
 const DATAFORSEO_API = "https://api.dataforseo.com/v3";
 
 /**
  * Phase 0: Build a prioritized backlink target list.
  *
- * Combines WordPress posts + GSC page-keyword data + DataForSEO backlink counts.
+ * Uses CACHED GSC page-keyword data + WordPress data (no API calls).
+ * The daily cron populates the cache — this just reads from it.
  *
  * Priority: position 4-15 (close to top 3 push) × high impressions × low existing backlinks
  */
@@ -24,10 +23,9 @@ export async function calculateBacklinkTargets(
   if (cached) return cached;
 
   try {
-    const [wpData, pageKeywords] = await Promise.all([
-      fetchWordPressData(siteUrl).catch(() => null),
-      fetchGSCPageKeywords(siteUrl).catch(() => [] as PageKeywordMap[]),
-    ]);
+    // Read from cache — no API calls
+    const wpData = getCachedWordPressData(siteUrl);
+    const pageKeywords = getCachedGSCPages(siteUrl) || [];
 
     const wpPosts = wpData?.content?.filter(p => p.type === "post") || [];
     const backlinkLog = getBacklinkLog(projectId);
@@ -77,7 +75,7 @@ export async function calculateBacklinkTargets(
     // Enrich top 5 with DataForSEO backlink counts
     await enrichWithDataForSEO(result);
 
-    console.log(`[BacklinkStrategy] ${result.length} targets from ${wpPosts.length} WP posts, ${pageKeywords.length} GSC pages`);
+    console.log(`[BacklinkStrategy] ${result.length} targets from ${wpPosts.length} WP posts, ${pageKeywords.length} GSC pages (cached data)`);
     setCache(cacheKey, result);
     return result;
   } catch (error) {

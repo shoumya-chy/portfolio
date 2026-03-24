@@ -20,12 +20,19 @@ export interface OutreachProject {
   id: string;
   siteId: string;
   name: string;
+  /** Human sender name shown in emails, e.g. "Shoumya Chowdhury" */
+  senderName: string;
   niche: string;
   emailAddress: string;
   domainFilters: string[];
   smtpConfig: SmtpConfig;
   imapConfig: ImapConfig;
   emailsPerWeek: number;
+  emailsPerDay: number;
+  /** Days after first email to send follow-up (default: 5) */
+  followUpDays: number;
+  /** Max follow-ups per prospect (default: 2) */
+  maxFollowUps: number;
   active: boolean;
   createdAt: string;
 }
@@ -67,12 +74,18 @@ export interface OutreachProspect {
   domainAuthority?: number;
   siteNiche?: string;
   guidelinesSnippet?: string;
+  /** Title of the prospect's write-for-us page (from search results) */
+  pageTitle?: string;
   // Phase 2 enhancements
   matchedPostUrl?: string;
   matchedPostTitle?: string;
   anchorText?: string;
   anchorStrategy?: "partial-match" | "natural" | "branded";
   pitchedTopics?: string[];
+  /** How many follow-up emails have been sent */
+  followUpCount?: number;
+  /** When the last follow-up was sent */
+  lastFollowUpAt?: string;
 }
 
 export interface BacklinkTarget {
@@ -107,5 +120,9 @@ export interface OutreachStats {
   noResponse: number;
   emailsSentThisWeek: number;
   weekStart: string;
+  emailsSentToday: number;
+  todayDate: string;
   lastRunAt: string;
+  lastDailyRunAt?: string;
+  pendingWithEmail: number;
 }

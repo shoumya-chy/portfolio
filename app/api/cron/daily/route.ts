@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSites } from "@/lib/config";
 import { setCache } from "@/lib/cache";
-import { fetchGSCData } from "@/lib/api-clients/gsc-client";
+import { fetchGSCData, fetchGSCPageKeywords } from "@/lib/api-clients/gsc-client";
 import { fetchBingData } from "@/lib/api-clients/bing-client";
 import { fetchRedditTopics } from "@/lib/api-clients/reddit-scraper";
 import { fetchQuoraTopics } from "@/lib/api-clients/quora-scraper";
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   const sites = getSites();
-  const results: Record<string, { gsc?: string; bing?: string; reddit?: string; quora?: string; sitemap?: string }> = {};
+  const results: Record<string, { gsc?: string; gscPages?: string; bing?: string; reddit?: string; quora?: string; sitemap?: string }> = {};
 
   // Fetch Reddit & Quora (not site-specific)
   let redditStatus = "skipped";
@@ -50,6 +50,15 @@ export async function GET(req: NextRequest) {
       results[site.name].gsc = `ok (${gscData.keywords.length} keywords)`;
     } catch (err) {
       results[site.name].gsc = `error: ${err instanceof Error ? err.message : "unknown"}`;
+    }
+
+    // GSC Page-Keyword mapping (used by outreach backlink strategy)
+    try {
+      const gscPages = await fetchGSCPageKeywords(site.url);
+      setCache("gsc-pages", gscPages, site.url);
+      results[site.name].gscPages = `ok (${gscPages.length} pages)`;
+    } catch (err) {
+      results[site.name].gscPages = `error: ${err instanceof Error ? err.message : "unknown"}`;
     }
 
     // Bing

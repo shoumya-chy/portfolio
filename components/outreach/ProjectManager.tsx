@@ -6,10 +6,14 @@ import { X, Loader2, AlertCircle } from "lucide-react";
 interface EditProject {
   id: string;
   name: string;
+  senderName?: string;
   niche: string;
   emailAddress: string;
   domainFilters: string[];
   emailsPerWeek: number;
+  emailsPerDay?: number;
+  followUpDays?: number;
+  maxFollowUps?: number;
   smtpConfig: { host: string; port: number; secure: boolean; username: string; password: string };
   imapConfig: { host: string; port: number; secure: boolean; username: string; password: string };
 }
@@ -22,10 +26,14 @@ interface Props {
 
 interface FormData {
   name: string;
+  senderName: string;
   niche: string;
   emailAddress: string;
   domainFilters: string;
   emailsPerWeek: number;
+  emailsPerDay: number;
+  followUpDays: number;
+  maxFollowUps: number;
   smtp: {
     host: string;
     port: number;
@@ -46,10 +54,14 @@ export function ProjectManager({ onClose, onCreated, editProject }: Props) {
   const isEdit = !!editProject;
   const [formData, setFormData] = useState<FormData>({
     name: editProject?.name || "",
+    senderName: editProject?.senderName || editProject?.name || "",
     niche: editProject?.niche || "",
     emailAddress: editProject?.emailAddress || "",
     domainFilters: editProject?.domainFilters?.join(", ") || "",
-    emailsPerWeek: editProject?.emailsPerWeek || 20,
+    emailsPerWeek: editProject?.emailsPerWeek || 140,
+    emailsPerDay: editProject?.emailsPerDay || 20,
+    followUpDays: editProject?.followUpDays || 5,
+    maxFollowUps: editProject?.maxFollowUps || 2,
     smtp: editProject?.smtpConfig || {
       host: "smtp.hostinger.com",
       port: 587,
@@ -86,10 +98,14 @@ export function ProjectManager({ onClose, onCreated, editProject }: Props) {
     try {
       const payload = {
         name: formData.name,
+        senderName: formData.senderName || formData.name,
         niche: formData.niche || "",
         emailAddress: formData.emailAddress,
         domainFilters: formData.domainFilters.split(",").map((f) => f.trim()).filter(Boolean),
         emailsPerWeek: formData.emailsPerWeek,
+        emailsPerDay: formData.emailsPerDay,
+        followUpDays: formData.followUpDays,
+        maxFollowUps: formData.maxFollowUps,
         smtpConfig: formData.smtp,
         imapConfig: formData.imap,
       };
@@ -151,6 +167,21 @@ export function ProjectManager({ onClose, onCreated, editProject }: Props) {
               <div>
                 <input
                   type="text"
+                  placeholder="Your name (shown in emails, e.g. Shoumya Chowdhury)"
+                  value={formData.senderName}
+                  onChange={(e) => setFormData({ ...formData, senderName: e.target.value })}
+                  required
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-[var(--color-text-dim)]">
+                  This name appears in the &quot;From&quot; field of outreach emails
+                </p>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <input
+                  type="text"
                   placeholder="Niche (leave empty for multi-niche)"
                   value={formData.niche}
                   onChange={(e) => setFormData({ ...formData, niche: e.target.value })}
@@ -160,8 +191,6 @@ export function ProjectManager({ onClose, onCreated, editProject }: Props) {
                   Empty = multi-niche (searches across all topics)
                 </p>
               </div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
               <input
                 type="email"
                 placeholder="Email address (e.g., outreach@yourdomain.com)"
@@ -170,14 +199,55 @@ export function ProjectManager({ onClose, onCreated, editProject }: Props) {
                 required
                 className={inputClass}
               />
-              <input
-                type="number"
-                placeholder="Emails per week"
-                value={formData.emailsPerWeek}
-                onChange={(e) => setFormData({ ...formData, emailsPerWeek: parseInt(e.target.value) || 20 })}
-                min="1"
-                className={inputClass}
-              />
+            </div>
+            <div className="grid sm:grid-cols-4 gap-4">
+              <div>
+                <input
+                  type="number"
+                  placeholder="Emails/day"
+                  value={formData.emailsPerDay}
+                  onChange={(e) => setFormData({ ...formData, emailsPerDay: parseInt(e.target.value) || 20 })}
+                  min="1"
+                  max="50"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-[var(--color-text-dim)]">Per day</p>
+              </div>
+              <div>
+                <input
+                  type="number"
+                  placeholder="Emails/week"
+                  value={formData.emailsPerWeek}
+                  onChange={(e) => setFormData({ ...formData, emailsPerWeek: parseInt(e.target.value) || 140 })}
+                  min="1"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-[var(--color-text-dim)]">Per week</p>
+              </div>
+              <div>
+                <input
+                  type="number"
+                  placeholder="Follow-up days"
+                  value={formData.followUpDays}
+                  onChange={(e) => setFormData({ ...formData, followUpDays: parseInt(e.target.value) || 5 })}
+                  min="2"
+                  max="14"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-[var(--color-text-dim)]">Days before follow-up</p>
+              </div>
+              <div>
+                <input
+                  type="number"
+                  placeholder="Max follow-ups"
+                  value={formData.maxFollowUps}
+                  onChange={(e) => setFormData({ ...formData, maxFollowUps: parseInt(e.target.value) || 2 })}
+                  min="0"
+                  max="5"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-[var(--color-text-dim)]">Follow-ups per prospect</p>
+              </div>
             </div>
             <input
               type="text"

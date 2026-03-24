@@ -1,10 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, LogOut, Loader2, AlertCircle, ChevronDown, Zap, Mail, CheckCircle2, Plus, Pencil, Target } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { RefreshCw, LogOut, Loader2, AlertCircle, ChevronDown, Zap, Mail, CheckCircle2, Plus, Pencil, Target, Search, Clock, X } from "lucide-react";
 import { ProspectsList } from "./ProspectsList";
 import { ProjectManager } from "./ProjectManager";
 import type { OutreachProject, OutreachProspect, OutreachStats, BacklinkTarget } from "@/lib/outreach/types";
+
+interface JobProgress {
+  jobId: string;
+  type: string;
+  status: "running" | "completed" | "failed";
+  message: string;
+  current: number;
+  total: number;
+  log: string[];
+  result?: Record<string, unknown>;
+  error?: string;
+}
 
 interface Props {
   onLogout: () => void;
@@ -20,22 +32,37 @@ export function OutreachDashboard({ onLogout }: Props) {
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [editingProject, setEditingProject] = useState<OutreachProject | null>(null);
   const [backlinkTargets, setBacklinkTargets] = useState<BacklinkTarget[]>([]);
+  const [successMsg, setSuccessMsg] = useState<string>("");
+  const [jobStatus, setJobStatus] = useState<JobProgress | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setLoadingKey = (key: string, val: boolean) =>
     setLoading((p) => ({ ...p, [key]: val }));
   const setErrorKey = (key: string, val: string) =>
     setErrors((p) => ({ ...p, [key]: val }));
 
-  // Safe JSON parser — handles HTML error pages from server crashes
   const safeJson = async (res: Response) => {
     const text = await res.text();
     try {
       return JSON.parse(text);
     } catch {
-      // Server returned HTML error page instead of JSON
       throw new Error(`Server error (${res.status}): ${text.substring(0, 100).replace(/<[^>]+>/g, "").trim() || "Internal server error"}`);
     }
   };
+
+  // ========== Data Fetching ==========
+
+  const refreshData = useCallback(async () => {
+    if (!selectedProjectId) return;
+    try {
+      const [prospectsRes, statsRes] = await Promise.all([
+        fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`).then(r => r.json()),
+        fetch(`/api/tools/guest-post-outreach/stats?projectId=${selectedProjectId}`).then(r => r.json()),
+      ]);
+      setProspects(prospectsRes.prospects || []);
+      setStats(statsRes.stats || null);
+    } catch { /* silent */ }
+  }, [selectedProjectId]);
 
   // Fetch projects on mount
   useEffect(() => {
@@ -49,25 +76,12 @@ export function OutreachDashboard({ onLogout }: Props) {
       .catch(() => setProjects([]));
   }, []);
 
-  // Fetch prospects and stats when selectedProjectId changes
+  // Fetch data when project changes
   useEffect(() => {
     if (!selectedProjectId) return;
-
     setLoadingKey("prospects", true);
     setErrorKey("prospects", "");
-
-    Promise.all([
-      fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`).then((r) => r.json()),
-      fetch(`/api/tools/guest-post-outreach/stats?projectId=${selectedProjectId}`).then((r) => r.json()),
-    ])
-      .then(([prospectsData, statsData]) => {
-        setProspects(prospectsData.prospects || []);
-        setStats(statsData.stats || null);
-      })
-      .catch((err) => {
-        setErrorKey("prospects", err instanceof Error ? err.message : "Failed to fetch data");
-      })
-      .finally(() => setLoadingKey("prospects", false));
+    refreshData().finally(() => setLoadingKey("prospects", false));
 
     // Also fetch backlink targets
     fetch("/api/tools/guest-post-outreach/backlink-targets", {
@@ -78,9 +92,100 @@ export function OutreachDashboard({ onLogout }: Props) {
       .then(r => r.json())
       .then(d => setBacklinkTargets(d.targets || []))
       .catch(() => setBacklinkTargets([]));
-  }, [selectedProjectId]);
 
-  const [successMsg, setSuccessMsg] = useState<string>("");
+    // Check if there's an existing running job
+    fetch(`/api/tools/guest-post-outreach/job-status?projectId=${selectedProjectId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.job?.status === "running") {
+          setJobStatus(d.job);
+          startPolling();
+        } else {
+          setJobStatus(null);
+        }
+      })
+      .catch(() => {});
+  }, [selectedProjectId, refreshData]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  // ========== Job Polling ==========
+
+  const startPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      if (!selectedProjectId) return;
+      try {
+        const res = await fetch(`/api/tools/guest-post-outreach/job-status?projectId=${selectedProjectId}`);
+        const data = await res.json();
+        const job = data.job as JobProgress | null;
+
+        if (!job) {
+          // Job file was cleared
+          if (pollRef.current) clearInterval(pollRef.current);
+          setJobStatus(null);
+          return;
+        }
+
+        setJobStatus(job);
+
+        if (job.status === "completed" || job.status === "failed") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          // Refresh data after job ends
+          await refreshData();
+
+          if (job.status === "completed") {
+            setSuccessMsg(job.message);
+            setTimeout(() => setSuccessMsg(""), 15000);
+          } else {
+            setErrorKey("job", job.error || job.message);
+          }
+        }
+      } catch { /* silent */ }
+    }, 2000);
+  }, [selectedProjectId, refreshData]);
+
+  // ========== Background Job Launcher ==========
+
+  const launchBackgroundJob = async (
+    endpoint: string,
+    buttonKey: string
+  ) => {
+    if (!selectedProjectId) return;
+    setErrorKey("job", "");
+    setErrorKey(buttonKey, "");
+    setSuccessMsg("");
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: selectedProjectId }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+
+      // Job started — begin polling
+      setJobStatus({
+        jobId: data.jobId || "",
+        type: buttonKey,
+        status: "running",
+        message: "Starting...",
+        current: 0,
+        total: 0,
+        log: [],
+      });
+      startPolling();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : `${buttonKey} failed`;
+      setErrorKey(buttonKey, msg);
+    }
+  };
+
+  // ========== Handlers ==========
 
   const handleFindSites = async () => {
     if (!selectedProjectId) return;
@@ -95,15 +200,8 @@ export function OutreachDashboard({ onLogout }: Props) {
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      // Refresh prospects after finding sites
-      const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
-      const prospectsData = await safeJson(prospectsRes);
-      setProspects(prospectsData.prospects || []);
-      // Refresh stats
-      const statsRes = await fetch(`/api/tools/guest-post-outreach/stats?projectId=${selectedProjectId}`);
-      const statsData = await safeJson(statsRes);
-      setStats(statsData.stats || null);
-      const debugInfo = data.debug ? ` (${data.debug.join(" → ")})` : "";
+      await refreshData();
+      const debugInfo = data.debug ? ` (${data.debug.join(" > ")})` : "";
       setSuccessMsg(`Found ${data.found || 0} new prospect${(data.found || 0) !== 1 ? "s" : ""} from ${data.searchResults || 0} search results${debugInfo}`);
       setTimeout(() => setSuccessMsg(""), 15000);
     } catch (err) {
@@ -114,32 +212,9 @@ export function OutreachDashboard({ onLogout }: Props) {
     }
   };
 
-  const handleSendEmails = async () => {
-    if (!selectedProjectId) return;
-    setLoadingKey("sendEmails", true);
-    setErrorKey("sendEmails", "");
-    setSuccessMsg("");
-    try {
-      const res = await fetch("/api/tools/guest-post-outreach/send-emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: selectedProjectId }),
-      });
-      const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      // Refresh prospects after sending emails
-      const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
-      const prospectsData = await safeJson(prospectsRes);
-      setProspects(prospectsData.prospects || []);
-      setSuccessMsg(`Sent ${data.sent || 0} outreach email${(data.sent || 0) !== 1 ? "s" : ""}`);
-      setTimeout(() => setSuccessMsg(""), 5000);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to send emails";
-      setErrorKey("sendEmails", msg);
-    } finally {
-      setLoadingKey("sendEmails", false);
-    }
-  };
+  const handleBulkFind = () => launchBackgroundJob("/api/tools/guest-post-outreach/bulk-find", "bulkFind");
+  const handleSendEmails = () => launchBackgroundJob("/api/tools/guest-post-outreach/send-emails", "sendEmails");
+  const handleDailyRun = () => launchBackgroundJob("/api/tools/guest-post-outreach/daily-run", "dailyRun");
 
   const handleCheckReplies = async () => {
     if (!selectedProjectId) return;
@@ -154,10 +229,7 @@ export function OutreachDashboard({ onLogout }: Props) {
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      // Refresh prospects after checking replies
-      const prospectsRes = await fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`);
-      const prospectsData = await safeJson(prospectsRes);
-      setProspects(prospectsData.prospects || []);
+      await refreshData();
       setSuccessMsg(`Processed ${data.processed || 0} repl${(data.processed || 0) !== 1 ? "ies" : "y"}`);
       setTimeout(() => setSuccessMsg(""), 5000);
     } catch (err) {
@@ -171,16 +243,8 @@ export function OutreachDashboard({ onLogout }: Props) {
   const handleRefresh = useCallback(() => {
     if (!selectedProjectId) return;
     setLoadingKey("refresh", true);
-    Promise.all([
-      fetch(`/api/tools/guest-post-outreach/prospects?projectId=${selectedProjectId}`).then((r) => r.json()),
-      fetch(`/api/tools/guest-post-outreach/stats?projectId=${selectedProjectId}`).then((r) => r.json()),
-    ])
-      .then(([prospectsData, statsData]) => {
-        setProspects(prospectsData.prospects || []);
-        setStats(statsData.stats || null);
-      })
-      .finally(() => setLoadingKey("refresh", false));
-  }, [selectedProjectId]);
+    refreshData().finally(() => setLoadingKey("refresh", false));
+  }, [selectedProjectId, refreshData]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -189,7 +253,6 @@ export function OutreachDashboard({ onLogout }: Props) {
 
   const handleProjectCreated = () => {
     setShowProjectManager(false);
-    // Refresh projects list
     fetch("/api/tools/guest-post-outreach/projects")
       .then((r) => r.json())
       .then((d) => {
@@ -199,8 +262,15 @@ export function OutreachDashboard({ onLogout }: Props) {
       });
   };
 
+  const handleDismissJob = async () => {
+    if (!selectedProjectId) return;
+    await fetch(`/api/tools/guest-post-outreach/job-status?projectId=${selectedProjectId}`, { method: "DELETE" });
+    setJobStatus(null);
+  };
+
   const currentProject = projects.find((p) => p.id === selectedProjectId);
-  const isAnyLoading = Object.values(loading).some(Boolean);
+  const isJobActive = jobStatus?.status === "running";
+  const isAnyLoading = Object.values(loading).some(Boolean) || isJobActive;
 
   return (
     <div className="space-y-6">
@@ -273,23 +343,39 @@ export function OutreachDashboard({ onLogout }: Props) {
           </button>
           <button
             onClick={handleFindSites}
-            disabled={loading.findSites || !selectedProjectId}
+            disabled={loading.findSites || isJobActive || !selectedProjectId}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--color-blue)] hover:opacity-90 text-white rounded-lg disabled:opacity-50 transition-colors"
           >
             {loading.findSites ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
             Find Sites
           </button>
           <button
+            onClick={handleBulkFind}
+            disabled={isJobActive || !selectedProjectId}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-500 hover:opacity-90 text-white rounded-lg disabled:opacity-50 transition-colors"
+          >
+            <Search size={14} />
+            Bulk Find (500+)
+          </button>
+          <button
             onClick={handleSendEmails}
-            disabled={loading.sendEmails || !selectedProjectId}
+            disabled={isJobActive || !selectedProjectId}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--color-orange)] hover:opacity-90 text-white rounded-lg disabled:opacity-50 transition-colors"
           >
-            {loading.sendEmails ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+            <Mail size={14} />
             Send Emails
           </button>
           <button
+            onClick={handleDailyRun}
+            disabled={isJobActive || !selectedProjectId}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-500 hover:opacity-90 text-white rounded-lg disabled:opacity-50 transition-colors"
+          >
+            <Clock size={14} />
+            Daily Run
+          </button>
+          <button
             onClick={handleCheckReplies}
-            disabled={loading.checkReplies || !selectedProjectId}
+            disabled={loading.checkReplies || isJobActive || !selectedProjectId}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[var(--color-green)] hover:opacity-90 text-white rounded-lg disabled:opacity-50 transition-colors"
           >
             {loading.checkReplies ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
@@ -304,6 +390,69 @@ export function OutreachDashboard({ onLogout }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Live Job Progress */}
+      {jobStatus && (
+        <div className={`p-4 rounded-xl border ${
+          jobStatus.status === "running"
+            ? "bg-blue-400/5 border-blue-400/20"
+            : jobStatus.status === "completed"
+            ? "bg-green-400/5 border-green-400/20"
+            : "bg-red-400/5 border-red-400/20"
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              {jobStatus.status === "running" && <Loader2 size={16} className="animate-spin text-blue-400" />}
+              {jobStatus.status === "completed" && <CheckCircle2 size={16} className="text-green-400" />}
+              {jobStatus.status === "failed" && <AlertCircle size={16} className="text-red-400" />}
+              <span className="text-sm font-medium">
+                {jobStatus.type === "bulkFind" ? "Bulk Find" :
+                 jobStatus.type === "sendEmails" ? "Send Emails" :
+                 jobStatus.type === "dailyRun" ? "Daily Run" :
+                 jobStatus.type === "bulk-find" ? "Bulk Find" :
+                 jobStatus.type === "send-emails" ? "Send Emails" :
+                 jobStatus.type === "daily-run" ? "Daily Run" :
+                 jobStatus.type}
+              </span>
+            </div>
+            {jobStatus.status !== "running" && (
+              <button
+                onClick={handleDismissJob}
+                className="text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          {jobStatus.total > 0 && (
+            <div className="w-full bg-[var(--color-bg)] rounded-full h-2 mb-2 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  jobStatus.status === "running" ? "bg-blue-400" :
+                  jobStatus.status === "completed" ? "bg-green-400" : "bg-red-400"
+                }`}
+                style={{ width: `${Math.min(100, (jobStatus.current / jobStatus.total) * 100)}%` }}
+              />
+            </div>
+          )}
+
+          <p className="text-xs text-[var(--color-text-dim)]">
+            {jobStatus.message}
+            {jobStatus.total > 0 && ` (${jobStatus.current}/${jobStatus.total})`}
+          </p>
+
+          {/* Show last few log lines when running */}
+          {jobStatus.status === "running" && jobStatus.log.length > 0 && (
+            <div className="mt-2 max-h-20 overflow-y-auto text-[10px] font-mono text-[var(--color-text-dim)] space-y-0.5">
+              {jobStatus.log.slice(-3).map((line, i) => (
+                <div key={i} className="truncate">{line.replace(/^\[.*?\]\s*/, "")}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Errors */}
       {Object.entries(errors)
@@ -329,13 +478,15 @@ export function OutreachDashboard({ onLogout }: Props) {
       {/* Pipeline Funnel */}
       {stats && selectedProjectId && (
         <div className="space-y-3">
-          {/* Funnel visualization */}
           <div className="p-4 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-[var(--color-text-dim)]">Outreach Pipeline</h3>
               <div className="flex items-center gap-2 text-xs text-[var(--color-text-dim)]">
-                <span>This week: {stats.emailsSentThisWeek}/{currentProject?.emailsPerWeek || 20} emails</span>
-                {stats.lastRunAt && <span>• Last: {new Date(stats.lastRunAt).toLocaleDateString()}</span>}
+                <span>Today: {stats.emailsSentToday || 0}/{currentProject?.emailsPerDay || 20}</span>
+                <span>• Week: {stats.emailsSentThisWeek}/{currentProject?.emailsPerWeek || 140}</span>
+                {(stats.pendingWithEmail ?? 0) > 0 && <span>• Ready: {stats.pendingWithEmail}</span>}
+                {stats.lastDailyRunAt && <span>• Last auto: {new Date(stats.lastDailyRunAt).toLocaleDateString()}</span>}
+                {!stats.lastDailyRunAt && stats.lastRunAt && <span>• Last: {new Date(stats.lastRunAt).toLocaleDateString()}</span>}
               </div>
             </div>
             <div className="flex items-center gap-1 text-xs">
@@ -353,7 +504,7 @@ export function OutreachDashboard({ onLogout }: Props) {
                     </div>
                     <div className="mt-1 text-[var(--color-text-dim)] truncate">{step.label}</div>
                   </div>
-                  {i < 4 && <span className="text-[var(--color-text-dim)] shrink-0">→</span>}
+                  {i < 4 && <span className="text-[var(--color-text-dim)] shrink-0">&rarr;</span>}
                 </div>
               ))}
               {stats.rejected > 0 && (
@@ -425,7 +576,7 @@ export function OutreachDashboard({ onLogout }: Props) {
         <ProspectsList prospects={prospects} projectId={selectedProjectId} onRefresh={handleRefresh} />
       ) : selectedProjectId ? (
         <div className="text-center py-12 text-[var(--color-text-dim)]">
-          No prospects yet. Click "Find Sites" to start.
+          No prospects yet. Click &quot;Find Sites&quot; to start.
         </div>
       ) : null}
 

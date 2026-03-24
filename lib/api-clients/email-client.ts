@@ -26,6 +26,10 @@ export async function sendEmail(config: SmtpConfig, from: string, options: SendE
     tls: {
       rejectUnauthorized: true,
     },
+    // Prevent hanging on bad SMTP config
+    connectionTimeout: 15000,   // 15s to establish TCP connection
+    greetingTimeout: 15000,     // 15s for SMTP greeting
+    socketTimeout: 30000,       // 30s inactivity timeout
   });
 
   const info = await transporter.sendMail({
