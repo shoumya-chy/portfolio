@@ -30,7 +30,10 @@ export async function sendEmail(config: SmtpConfig, from: string, options: SendE
     connectionTimeout: 15000,   // 15s to establish TCP connection
     greetingTimeout: 15000,     // 15s for SMTP greeting
     socketTimeout: 30000,       // 30s inactivity timeout
-  });
+    // Force IPv4 — many VPS/droplets don't have IPv6 connectivity
+    dnsOptions: { family: 4 },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const info = await transporter.sendMail({
     from,
