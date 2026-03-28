@@ -328,7 +328,7 @@ export function DirectoryDashboard({ onLogout }: Props) {
     }
   };
 
-  const handleStartSubmission = async () => {
+  const handleStartSubmission = async (mode: "new" | "retry-failed" | "retry-skipped" | "retry-both" = "new") => {
     if (!selectedSiteId) return;
     setLoadingKey("submit", true);
     setErrorKey("submit", "");
@@ -336,12 +336,18 @@ export function DirectoryDashboard({ onLogout }: Props) {
       const res = await fetch("/api/tools/directory-submitter/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId: selectedSiteId }),
+        body: JSON.stringify({ siteId: selectedSiteId, mode }),
       });
       const d = await safeJson(res);
       if (!res.ok) throw new Error(d.error);
       await fetchJobStatus();
-      setSuccessMsg("Submission job started!");
+      const labels: Record<string, string> = {
+        new: "Submission job started!",
+        "retry-failed": "Retrying failed directories...",
+        "retry-skipped": "Retrying skipped directories...",
+        "retry-both": "Retrying failed & skipped directories...",
+      };
+      setSuccessMsg(labels[mode] || "Job started!");
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err: unknown) {
       setErrorKey("submit", err instanceof Error ? err.message : "Failed to start");
@@ -559,27 +565,60 @@ export function DirectoryDashboard({ onLogout }: Props) {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 ml-3">
-                    <button
-                      onClick={() => handleStartSubmission()}
-                      disabled={loading.submit || job?.status === "running" || site.id !== selectedSiteId}
-                      className="px-3 py-1.5 text-xs font-medium bg-[var(--color-green)]/10 text-[var(--color-green)] border border-[var(--color-green)]/30 rounded-lg hover:bg-[var(--color-green)]/20 transition-all disabled:opacity-40 flex items-center gap-1"
-                    >
-                      {loading.submit && site.id === selectedSiteId ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                      Submit
-                    </button>
-                    <button
-                      onClick={() => { setEditingSite(site); setShowAddSite(true); }}
-                      className="p-1.5 text-[var(--color-text-dim)] hover:text-[var(--color-accent)] transition-colors"
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSite(site.id)}
-                      className="p-1.5 text-[var(--color-text-dim)] hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <div className="flex flex-col items-end gap-1.5 ml-3">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleStartSubmission("new")}
+                        disabled={loading.submit || job?.status === "running" || site.id !== selectedSiteId}
+                        className="px-3 py-1.5 text-xs font-medium bg-[var(--color-green)]/10 text-[var(--color-green)] border border-[var(--color-green)]/30 rounded-lg hover:bg-[var(--color-green)]/20 transition-all disabled:opacity-40 flex items-center gap-1"
+                      >
+                        {loading.submit && site.id === selectedSiteId ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                        Submit
+                      </button>
+                      <button
+                        onClick={() => { setEditingSite(site); setShowAddSite(true); }}
+                        className="p-1.5 text-[var(--color-text-dim)] hover:text-[var(--color-accent)] transition-colors"
+                      >
+                        <RefreshCw size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSite(site.id)}
+                        className="p-1.5 text-[var(--color-text-dim)] hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    {site.id === selectedSiteId && stats && (stats.failed > 0 || stats.skipped > 0) && (
+                      <div className="flex items-center gap-1">
+                        {stats.failed > 0 && (
+                          <button
+                            onClick={() => handleStartSubmission("retry-failed")}
+                            disabled={loading.submit || job?.status === "running"}
+                            className="px-2 py-1 text-[10px] font-medium bg-red-400/10 text-red-400 border border-red-400/30 rounded-md hover:bg-red-400/20 transition-all disabled:opacity-40 flex items-center gap-1"
+                          >
+                            <RefreshCw size={10} /> Retry Failed ({stats.failed})
+                          </button>
+                        )}
+                        {stats.skipped > 0 && (
+                          <button
+                            onClick={() => handleStartSubmission("retry-skipped")}
+                            disabled={loading.submit || job?.status === "running"}
+                            className="px-2 py-1 text-[10px] font-medium bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 rounded-md hover:bg-yellow-400/20 transition-all disabled:opacity-40 flex items-center gap-1"
+                          >
+                            <RefreshCw size={10} /> Retry Skipped ({stats.skipped})
+                          </button>
+                        )}
+                        {stats.failed > 0 && stats.skipped > 0 && (
+                          <button
+                            onClick={() => handleStartSubmission("retry-both")}
+                            disabled={loading.submit || job?.status === "running"}
+                            className="px-2 py-1 text-[10px] font-medium bg-orange-400/10 text-orange-400 border border-orange-400/30 rounded-md hover:bg-orange-400/20 transition-all disabled:opacity-40 flex items-center gap-1"
+                          >
+                            <RefreshCw size={10} /> Retry All
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
