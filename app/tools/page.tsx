@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Wrench, Sparkles, ArrowRight, Send, Newspaper, Globe } from "lucide-react";
+import { Wrench, Sparkles, ArrowRight, Send, Newspaper, Globe, Bookmark } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -40,6 +40,14 @@ const tools = [
     color: "var(--color-orange)",
     icon: Globe,
     href: "/tools/directory-submitter",
+  },
+  {
+    title: "Social Bookmarking",
+    desc: "Auto-discovers posts from your sitemap/RSS and submits them to 30+ social bookmarking platforms. Build backlinks and get indexed faster.",
+    status: "Live",
+    color: "var(--color-purple)",
+    icon: Bookmark,
+    href: "/tools/social-bookmarking",
   },
 ];
 
