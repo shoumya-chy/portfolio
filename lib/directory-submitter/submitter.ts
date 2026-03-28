@@ -1,7 +1,8 @@
 import type { SiteToSubmit, DirectoryInfo, SubmissionRecord, SubmissionJob } from "./types";
-import { saveSubmission, saveJob, getJob } from "./storage";
+import { saveSubmission, saveJob, getJob, getSettings } from "./storage";
 import directories from "./directories";
 import * as cheerio from "cheerio";
+import { detectCaptcha, solveCaptcha, fetchCaptchaImage } from "./captcha-solver";
 
 /**
  * Main submission engine.
@@ -123,21 +124,54 @@ async function submitToDirectory(
     const html = await pageRes.text();
     const $ = cheerio.load(html);
 
-    // Detect captcha — skip if found (but be more precise to avoid false positives)
-    const hasCaptcha =
-      html.includes("g-recaptcha") ||
-      html.includes("h-captcha") ||
-      html.includes("hcaptcha") ||
-      $('img[src*="captcha"]').length > 0 ||
-      $('input[name*="captcha"]').length > 0 ||
-      $(".g-recaptcha").length > 0 ||
-      $('[data-sitekey]').length > 0;
+    // Detect CAPTCHA
+    const captchaDetection = detectCaptcha(html, $);
+    let captchaToken: string | undefined;
+    let captchaText: string | undefined;
+    let captchaInputName: string | undefined;
 
-    if (hasCaptcha) {
-      record.status = "skipped";
-      record.errorMessage = "Directory requires CAPTCHA — cannot auto-submit";
-      record.attemptedAt = new Date().toISOString();
-      return record;
+    if (captchaDetection.type !== "none") {
+      const settings = getSettings();
+      if (!settings.solveCaptchas || !settings.twoCaptchaApiKey) {
+        record.status = "skipped";
+        record.errorMessage = "Directory requires CAPTCHA — enable CAPTCHA solving in settings";
+        record.attemptedAt = new Date().toISOString();
+        return record;
+      }
+
+      // For image captchas, fetch the image first
+      let imageBase64: string | undefined;
+      if (captchaDetection.type === "image") {
+        const captchaImg = $('img[src*="captcha"], img[alt*="captcha"], img[id*="captcha"]').first();
+        let imgSrc = captchaImg.attr("src") || "";
+        if (imgSrc && !imgSrc.startsWith("http")) {
+          const urlObj = new URL(dir.submitUrl);
+          imgSrc = imgSrc.startsWith("/")
+            ? `${urlObj.origin}${imgSrc}`
+            : `${urlObj.origin}/${imgSrc}`;
+        }
+        if (imgSrc) {
+          imageBase64 = await fetchCaptchaImage(imgSrc, BROWSER_HEADERS, cookieStr) || undefined;
+        }
+      }
+
+      const solution = await solveCaptcha(
+        settings.twoCaptchaApiKey,
+        captchaDetection,
+        dir.submitUrl,
+        imageBase64,
+      );
+
+      if (!solution.solved) {
+        record.status = "skipped";
+        record.errorMessage = solution.error || "CAPTCHA solving failed";
+        record.attemptedAt = new Date().toISOString();
+        return record;
+      }
+
+      captchaToken = solution.token;
+      captchaText = solution.text;
+      captchaInputName = solution.inputName;
     }
 
     // Find the best submission form (prefer forms with URL/link fields)
@@ -236,6 +270,19 @@ async function submitToDirectory(
           formData.set(n, site.reciprocalUrl || site.url);
         }
       });
+
+    // Inject CAPTCHA solution if we solved one
+    if (captchaToken) {
+      // reCAPTCHA v2 / hCaptcha — inject the token
+      formData.set("g-recaptcha-response", captchaToken);
+      if (captchaDetection.type === "hcaptcha") {
+        formData.set("h-captcha-response", captchaToken);
+      }
+    }
+    if (captchaText && captchaInputName) {
+      // Image CAPTCHA — inject the text answer
+      formData.set(captchaInputName, captchaText);
+    }
 
     // Step 2: Submit the form
     const method = (form.attr("method") || "POST").toUpperCase();

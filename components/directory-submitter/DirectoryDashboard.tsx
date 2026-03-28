@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   RefreshCw, LogOut, Loader2, AlertCircle, Plus, Trash2,
   Globe, Send, CheckCircle2, XCircle, Clock,
-  X, ExternalLink, FolderOpen, Pause,
+  X, ExternalLink, FolderOpen, Pause, Settings, Key, Eye, EyeOff,
 } from "lucide-react";
 import type {
   SiteToSubmit, SubmissionRecord, DirectorySubmitterStats,
@@ -15,7 +15,7 @@ interface Props {
   onLogout: () => void;
 }
 
-type Tab = "sites" | "submissions" | "directories";
+type Tab = "sites" | "submissions" | "directories" | "settings";
 
 const safeJson = async (res: Response) => {
   const text = await res.text();
@@ -208,6 +208,9 @@ export function DirectoryDashboard({ onLogout }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMsg, setSuccessMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [captchaSettings, setCaptchaSettings] = useState({ twoCaptchaApiKey: "", solveCaptchas: false, hasApiKey: false });
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const setLoadingKey = (key: string, val: boolean) => setLoading((p) => ({ ...p, [key]: val }));
   const setErrorKey = (key: string, val: string) => setErrors((p) => ({ ...p, [key]: val }));
@@ -241,6 +244,13 @@ export function DirectoryDashboard({ onLogout }: Props) {
     } catch { /* silent */ }
   }, []);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const d = await fetch("/api/tools/directory-submitter/settings").then(safeJson);
+      setCaptchaSettings(d.settings || { twoCaptchaApiKey: "", solveCaptchas: false, hasApiKey: false });
+    } catch { /* silent */ }
+  }, []);
+
   const fetchJobStatus = useCallback(async () => {
     try {
       const d = await fetch("/api/tools/directory-submitter/job-status").then(safeJson);
@@ -254,7 +264,8 @@ export function DirectoryDashboard({ onLogout }: Props) {
   useEffect(() => {
     fetchSites();
     fetchDirectories();
-  }, [fetchSites, fetchDirectories]);
+    fetchSettings();
+  }, [fetchSites, fetchDirectories, fetchSettings]);
 
   useEffect(() => {
     if (selectedSiteId) {
@@ -344,6 +355,35 @@ export function DirectoryDashboard({ onLogout }: Props) {
       await fetch("/api/tools/directory-submitter/job-status", { method: "DELETE" });
       await fetchJobStatus();
     } catch { /* silent */ }
+  };
+
+  const handleSaveSettings = async () => {
+    setLoadingKey("settings", true);
+    setErrorKey("settings", "");
+    try {
+      const body: Record<string, unknown> = { solveCaptchas: captchaSettings.solveCaptchas };
+      if (apiKeyInput && !apiKeyInput.includes("*")) {
+        body.twoCaptchaApiKey = apiKeyInput;
+      }
+      const res = await fetch("/api/tools/directory-submitter/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Failed to save settings");
+      await fetchSettings();
+      setApiKeyInput("");
+      setSuccessMsg("Settings saved!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err: unknown) {
+      setErrorKey("settings", err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setLoadingKey("settings", false);
+    }
+  };
+
+  const handleToggleCaptcha = () => {
+    setCaptchaSettings((p) => ({ ...p, solveCaptchas: !p.solveCaptchas }));
   };
 
   // ========== Status Badge ============
@@ -461,7 +501,7 @@ export function DirectoryDashboard({ onLogout }: Props) {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-[var(--color-border)]">
-        {(["sites", "submissions", "directories"] as Tab[]).map((tab) => (
+        {(["sites", "submissions", "directories", "settings"] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -641,6 +681,66 @@ export function DirectoryDashboard({ onLogout }: Props) {
                 {dir.notes && <p className="text-[10px] text-[var(--color-text-dim)] mt-1">{dir.notes}</p>}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "settings" && (
+        <div className="space-y-6 max-w-lg">
+          <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Key size={16} className="text-[var(--color-accent)]" />
+              <h3 className="font-semibold text-sm">CAPTCHA Solving (2Captcha)</h3>
+            </div>
+            <p className="text-xs text-[var(--color-text-dim)]">
+              Enable automatic CAPTCHA solving to submit to directories that require reCAPTCHA, hCaptcha, or image CAPTCHAs. Costs ~$0.003 per solve (~$3 per 1000).
+            </p>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-[var(--color-text)]">Enable CAPTCHA Solving</label>
+              <button
+                onClick={handleToggleCaptcha}
+                className={`relative w-11 h-6 rounded-full transition-colors ${captchaSettings.solveCaptchas ? "bg-[var(--color-accent)]" : "bg-[var(--color-border)]"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${captchaSettings.solveCaptchas ? "translate-x-5" : ""}`} />
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs text-[var(--color-text-dim)] mb-1 block">2Captcha API Key</label>
+              <div className="relative">
+                <input
+                  type={showApiKey ? "text" : "password"}
+                  value={apiKeyInput || (captchaSettings.hasApiKey ? captchaSettings.twoCaptchaApiKey : "")}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="Enter your 2Captcha API key"
+                  className="w-full px-3 py-2.5 pr-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)] font-mono"
+                />
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--color-text-dim)] hover:text-[var(--color-text)]"
+                >
+                  {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <p className="text-[10px] text-[var(--color-text-dim)] mt-1">
+                Get your API key from <a href="https://2captcha.com?from=23376542" target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">2captcha.com</a>. Status: {captchaSettings.hasApiKey ? <span className="text-green-400">configured</span> : <span className="text-yellow-400">not set</span>}
+              </p>
+            </div>
+
+            {errors.settings && (
+              <p className="text-xs text-red-400 flex items-center gap-1">
+                <AlertCircle size={12} /> {errors.settings}
+              </p>
+            )}
+
+            <button
+              onClick={handleSaveSettings}
+              disabled={loading.settings}
+              className="w-full py-2.5 text-sm font-semibold bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading.settings ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : <><Settings size={14} /> Save Settings</>}
+            </button>
           </div>
         </div>
       )}

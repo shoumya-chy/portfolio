@@ -123,6 +123,30 @@ export function clearJob(): void {
   } catch { /* ignore */ }
 }
 
+// ============ Settings ============
+
+export interface SubmitterSettings {
+  twoCaptchaApiKey: string;
+  solveCaptchas: boolean;
+}
+
+function settingsFile(): string {
+  ensureDir(DATA_DIR);
+  return path.join(DATA_DIR, "settings.json");
+}
+
+export function getSettings(): SubmitterSettings {
+  try {
+    return JSON.parse(fs.readFileSync(settingsFile(), "utf-8"));
+  } catch {
+    return { twoCaptchaApiKey: "", solveCaptchas: false };
+  }
+}
+
+export function saveSettings(settings: SubmitterSettings): void {
+  fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2), "utf-8");
+}
+
 // ============ Stats ============
 
 export function getStats(siteId?: string): DirectorySubmitterStats {
