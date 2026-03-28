@@ -13,13 +13,29 @@ function generateId(): string {
   return `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Common browser-like headers to avoid 403 blocks */
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  Connection: "keep-alive",
+  "Upgrade-Insecure-Requests": "1",
+  "Cache-Control": "max-age=0",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+};
+
 /**
  * Build common form data from site info.
  * Directories have varied field names but these cover most cases.
  */
 function buildFormData(site: SiteToSubmit, dir: DirectoryInfo): Record<string, string> {
   const base: Record<string, string> = {
-    // Common field names used by most directories
     url: site.url,
     site_url: site.url,
     website: site.url,
@@ -42,23 +58,14 @@ function buildFormData(site: SiteToSubmit, dir: DirectoryInfo): Record<string, s
     language: site.language || "English",
   };
 
-  // Add optional fields if present
   if (site.contactPhone) {
     base.phone = site.contactPhone;
     base.contact_phone = site.contactPhone;
   }
-  if (site.address) {
-    base.address = site.address;
-  }
-  if (site.city) {
-    base.city = site.city;
-  }
-  if (site.state) {
-    base.state = site.state;
-  }
-  if (site.country) {
-    base.country = site.country;
-  }
+  if (site.address) base.address = site.address;
+  if (site.city) base.city = site.city;
+  if (site.state) base.state = site.state;
+  if (site.country) base.country = site.country;
   if (site.reciprocalUrl) {
     base.reciprocal_url = site.reciprocalUrl;
     base.reciprocal = site.reciprocalUrl;
@@ -77,7 +84,7 @@ function buildFormData(site: SiteToSubmit, dir: DirectoryInfo): Record<string, s
 }
 
 /**
- * Attempt to submit to a single directory via HTTP POST.
+ * Attempt to submit to a single directory via HTTP.
  * Returns the submission record with status.
  */
 async function submitToDirectory(
@@ -93,15 +100,12 @@ async function submitToDirectory(
   };
 
   try {
-    // First, fetch the submission page to detect forms and CSRF tokens
+    // Step 1: Fetch the submission page to detect forms and CSRF tokens
     const pageRes = await fetch(dir.submitUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
+      method: "GET",
+      headers: { ...BROWSER_HEADERS },
       redirect: "follow",
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
     });
 
     if (!pageRes.ok) {
@@ -112,16 +116,22 @@ async function submitToDirectory(
       return record;
     }
 
+    // Capture cookies from the response for the submit step
+    const setCookies = pageRes.headers.getSetCookie?.() || [];
+    const cookieStr = setCookies.map((c) => c.split(";")[0]).join("; ");
+
     const html = await pageRes.text();
     const $ = cheerio.load(html);
 
-    // Detect captcha — skip if found
+    // Detect captcha — skip if found (but be more precise to avoid false positives)
     const hasCaptcha =
       html.includes("g-recaptcha") ||
+      html.includes("h-captcha") ||
       html.includes("hcaptcha") ||
-      html.includes("captcha") ||
       $('img[src*="captcha"]').length > 0 ||
-      $('input[name*="captcha"]').length > 0;
+      $('input[name*="captcha"]').length > 0 ||
+      $(".g-recaptcha").length > 0 ||
+      $('[data-sitekey]').length > 0;
 
     if (hasCaptcha) {
       record.status = "skipped";
@@ -130,10 +140,21 @@ async function submitToDirectory(
       return record;
     }
 
-    // Find the main form
-    const form = $("form").first();
+    // Find the best submission form (prefer forms with URL/link fields)
+    let form = $("form").filter((_, el) => {
+      const formHtml = $(el).html()?.toLowerCase() || "";
+      return (
+        formHtml.includes("url") ||
+        formHtml.includes("link") ||
+        formHtml.includes("website") ||
+        formHtml.includes("submit")
+      );
+    }).first();
+
+    // Fallback to first form if no good match
+    if (!form.length) form = $("form").first();
+
     if (!form.length) {
-      // No form found — some directories may need account creation
       record.status = "skipped";
       record.errorMessage = "No submission form found on page (may require account creation)";
       record.attemptedAt = new Date().toISOString();
@@ -142,12 +163,14 @@ async function submitToDirectory(
 
     // Extract form action URL
     let actionUrl = form.attr("action") || dir.submitUrl;
+    if (actionUrl === "#" || actionUrl === "") actionUrl = dir.submitUrl;
     if (actionUrl.startsWith("/")) {
       const urlObj = new URL(dir.submitUrl);
       actionUrl = `${urlObj.origin}${actionUrl}`;
     } else if (!actionUrl.startsWith("http")) {
       const urlObj = new URL(dir.submitUrl);
-      actionUrl = `${urlObj.origin}/${actionUrl}`;
+      const basePath = urlObj.pathname.replace(/\/[^/]*$/, "/");
+      actionUrl = `${urlObj.origin}${basePath}${actionUrl}`;
     }
 
     // Build form data — start with hidden inputs from the form
@@ -158,70 +181,101 @@ async function submitToDirectory(
       if (n) formData.set(n, v);
     });
 
+    // Also grab any submit button values (some forms require these)
+    form.find("input[type=submit]").each((_, el) => {
+      const n = $(el).attr("name");
+      const v = $(el).attr("value") || "Submit";
+      if (n) formData.set(n, v);
+    });
+
     // Map site data to form fields
     const siteData = buildFormData(site, dir);
 
     // Detect form fields and fill them in
-    form.find("input[type=text], input[type=email], input[type=url], textarea, select").each((_, el) => {
-      const n = $(el).attr("name");
-      if (!n) return;
-      const nl = n.toLowerCase();
+    form
+      .find("input[type=text], input[type=email], input[type=url], input:not([type]), textarea, select")
+      .each((_, el) => {
+        const n = $(el).attr("name");
+        if (!n) return;
+        const nl = n.toLowerCase();
 
-      // Try direct match
-      if (siteData[nl]) {
-        formData.set(n, siteData[nl]);
-        return;
-      }
+        // Try direct match first
+        if (siteData[nl]) {
+          formData.set(n, siteData[nl]);
+          return;
+        }
 
-      // Fuzzy match on common patterns
-      if (nl.includes("url") || nl.includes("link") || nl.includes("website") || nl.includes("site_url")) {
-        formData.set(n, site.url);
-      } else if (nl.includes("title") || nl.includes("name") || nl.includes("site_name")) {
-        formData.set(n, site.name);
-      } else if (nl.includes("desc") || nl.includes("about")) {
-        formData.set(n, site.description);
-      } else if (nl.includes("email") || nl.includes("mail")) {
-        formData.set(n, site.contactEmail);
-      } else if (nl.includes("categ") || nl.includes("topic")) {
-        formData.set(n, site.category);
-      } else if (nl.includes("keyword") || nl.includes("tag")) {
-        formData.set(n, site.keywords.join(", "));
-      } else if (nl.includes("phone") || nl.includes("tel")) {
-        formData.set(n, site.contactPhone || "");
-      } else if (nl.includes("owner") || nl.includes("contact") || nl.includes("author")) {
-        formData.set(n, site.contactName);
-      } else if (nl.includes("city")) {
-        formData.set(n, site.city || "");
-      } else if (nl.includes("state") || nl.includes("province") || nl.includes("region")) {
-        formData.set(n, site.state || "");
-      } else if (nl.includes("country")) {
-        formData.set(n, site.country || "");
-      } else if (nl.includes("address")) {
-        formData.set(n, site.address || "");
-      } else if (nl.includes("lang")) {
-        formData.set(n, site.language || "English");
-      }
-    });
+        // Fuzzy match on common patterns
+        if (nl.includes("url") || nl.includes("link") || nl.includes("website") || nl.includes("site_url") || nl.includes("homepage")) {
+          formData.set(n, site.url);
+        } else if (nl.includes("title") || nl.includes("name") || nl.includes("site_name") || nl.includes("sitename")) {
+          formData.set(n, site.name);
+        } else if (nl.includes("desc") || nl.includes("about") || nl.includes("summary") || nl.includes("comment")) {
+          formData.set(n, site.description);
+        } else if (nl.includes("email") || nl.includes("mail")) {
+          formData.set(n, site.contactEmail);
+        } else if (nl.includes("categ") || nl.includes("topic") || nl.includes("niche") || nl.includes("industry")) {
+          formData.set(n, site.category);
+        } else if (nl.includes("keyword") || nl.includes("tag") || nl.includes("meta")) {
+          formData.set(n, site.keywords.join(", "));
+        } else if (nl.includes("phone") || nl.includes("tel") || nl.includes("mobile")) {
+          formData.set(n, site.contactPhone || "");
+        } else if (nl.includes("owner") || nl.includes("contact") || nl.includes("author") || nl.includes("webmaster") || nl.includes("your_name")) {
+          formData.set(n, site.contactName);
+        } else if (nl.includes("city") || nl.includes("town")) {
+          formData.set(n, site.city || "");
+        } else if (nl.includes("state") || nl.includes("province") || nl.includes("region")) {
+          formData.set(n, site.state || "");
+        } else if (nl.includes("country") || nl.includes("nation")) {
+          formData.set(n, site.country || "");
+        } else if (nl.includes("address") || nl.includes("street")) {
+          formData.set(n, site.address || "");
+        } else if (nl.includes("lang")) {
+          formData.set(n, site.language || "English");
+        } else if (nl.includes("reciproc") || nl.includes("backlink")) {
+          formData.set(n, site.reciprocalUrl || site.url);
+        }
+      });
 
-    // Submit the form
+    // Step 2: Submit the form
     const method = (form.attr("method") || "POST").toUpperCase();
-    const submitRes = await fetch(actionUrl, {
-      method: method === "GET" ? "GET" : "POST",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
-        Referer: dir.submitUrl,
-      },
-      body: formData.toString(),
-      redirect: "follow",
-      signal: AbortSignal.timeout(15000),
-    });
+
+    let submitRes: Response;
+    if (method === "GET") {
+      // For GET forms, append params to URL instead of body
+      const submitUrl = new URL(actionUrl);
+      formData.forEach((v, k) => submitUrl.searchParams.set(k, v));
+      submitRes = await fetch(submitUrl.toString(), {
+        method: "GET",
+        headers: {
+          ...BROWSER_HEADERS,
+          Referer: dir.submitUrl,
+          ...(cookieStr ? { Cookie: cookieStr } : {}),
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(20000),
+      });
+    } else {
+      submitRes = await fetch(actionUrl, {
+        method: "POST",
+        headers: {
+          ...BROWSER_HEADERS,
+          "Content-Type": "application/x-www-form-urlencoded",
+          Referer: dir.submitUrl,
+          Origin: new URL(dir.submitUrl).origin,
+          "Sec-Fetch-Site": "same-origin",
+          ...(cookieStr ? { Cookie: cookieStr } : {}),
+        },
+        body: formData.toString(),
+        redirect: "follow",
+        signal: AbortSignal.timeout(20000),
+      });
+    }
 
     record.responseCode = submitRes.status;
     record.attemptedAt = new Date().toISOString();
 
-    // Check response for success indicators
+    // Check response for success/failure indicators
     const responseText = await submitRes.text();
     const responseLower = responseText.toLowerCase();
 
@@ -237,6 +291,17 @@ async function submitToDirectory(
       "successfully added",
       "listing submitted",
       "thank you for submitting",
+      "your site has been",
+      "added to our directory",
+      "submission complete",
+      "has been submitted",
+      "awaiting approval",
+      "we have received",
+      "submitted successfully",
+      "your listing",
+      "link has been added",
+      "your website has been",
+      "approval pending",
     ];
 
     const failureIndicators = [
@@ -247,9 +312,11 @@ async function submitToDirectory(
       "already submitted",
       "banned",
       "blacklisted",
-      "spam",
+      "spam detected",
       "error occurred",
       "submission failed",
+      "not accepted",
+      "has been rejected",
     ];
 
     const isSuccess = successIndicators.some((i) => responseLower.includes(i));
@@ -263,7 +330,6 @@ async function submitToDirectory(
       const matched = failureIndicators.find((i) => responseLower.includes(i));
       record.errorMessage = `Directory response indicates failure: "${matched}"`;
     } else if (submitRes.ok || submitRes.status === 302 || submitRes.status === 301) {
-      // Redirect or OK without clear indicators — assume submitted
       record.status = "submitted";
       record.notes = "Form posted successfully (no explicit confirmation detected)";
     } else {
@@ -274,8 +340,12 @@ async function submitToDirectory(
     record.status = "failed";
     record.attemptedAt = new Date().toISOString();
     if (err instanceof Error) {
-      if (err.name === "TimeoutError" || err.message.includes("timeout")) {
-        record.errorMessage = "Request timed out (15s)";
+      if (err.name === "TimeoutError" || err.name === "AbortError" || err.message.includes("timeout")) {
+        record.errorMessage = "Request timed out (20s)";
+      } else if (err.message.includes("fetch failed") || err.message.includes("ENOTFOUND")) {
+        record.errorMessage = "Site unreachable (DNS/network error)";
+      } else if (err.message.includes("certificate") || err.message.includes("SSL")) {
+        record.errorMessage = "SSL certificate error";
       } else {
         record.errorMessage = err.message.substring(0, 200);
       }
@@ -301,7 +371,6 @@ export async function runSubmissionPipeline(
   const toSubmit = activeDirectories.filter((d) => !alreadySubmitted.has(d.id));
 
   if (toSubmit.length === 0) {
-    // Update job as completed with nothing to do
     const job = getJob();
     if (job) {
       job.status = "completed";
@@ -312,7 +381,6 @@ export async function runSubmissionPipeline(
     return;
   }
 
-  // Initialize or update job
   const job: SubmissionJob = getJob() || {
     jobId: `job_${Date.now()}`,
     siteId: site.id,
@@ -332,7 +400,6 @@ export async function runSubmissionPipeline(
   saveJob(job);
 
   for (const dir of toSubmit) {
-    // Check if job was cancelled
     const currentJob = getJob();
     if (currentJob?.status === "cancelled") {
       job.status = "cancelled";
@@ -361,8 +428,8 @@ export async function runSubmissionPipeline(
 
     saveJob(job);
 
-    // Small delay between submissions (1-3 seconds) to be polite
-    await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
+    // Delay 1.5-3.5s between submissions to appear human-like
+    await new Promise((r) => setTimeout(r, 1500 + Math.random() * 2000));
   }
 
   job.status = "completed";
