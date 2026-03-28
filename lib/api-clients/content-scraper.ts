@@ -173,8 +173,11 @@ function extractEmailsFromHtml(html: string): string[] {
  * Extract the best contact email from a prospect's site.
  * Checks: write-for-us page → contact page → about page.
  * Prioritizes editor/submissions emails over generic ones.
+ *
+ * @param url - The URL to search for emails
+ * @param existingHtml - If provided, skip re-fetching the main URL (already scraped)
  */
-export async function extractContactEmail(url: string): Promise<string | null> {
+export async function extractContactEmail(url: string, existingHtml?: string): Promise<string | null> {
   const fetchPage = async (pageUrl: string): Promise<string | null> => {
     try {
       const res = await fetch(pageUrl, {
@@ -192,19 +195,17 @@ export async function extractContactEmail(url: string): Promise<string | null> {
   };
 
   try {
-    // Phase 1: Check the write-for-us page itself (highest priority)
-    const mainHtml = await fetchPage(url);
+    // Phase 1: Check the write-for-us page itself (use existing HTML if available)
+    const mainHtml = existingHtml || await fetchPage(url);
     if (mainHtml) {
       const emails = extractEmailsFromHtml(mainHtml);
       if (emails.length > 0) return emails[0];
     }
 
-    // Phase 2: Check /contact and related pages
+    // Phase 2: Check /contact and related pages (limit to 3 most likely paths)
     const domain = new URL(url).origin;
     const contactPaths = [
-      "/contact", "/contact-us", "/about", "/about-us",
-      "/write-for-us", "/guest-post", "/contribute",
-      "/submit-guest-post", "/guest-post-guidelines",
+      "/contact", "/contact-us", "/about",
     ];
 
     for (const contactPath of contactPaths) {
@@ -348,8 +349,9 @@ export async function scrapeProspectMetadata(url: string): Promise<ProspectScrap
     result.guidelinesSnippet = guidelineSentences.join(". ").slice(0, 1000);
 
     // If we didn't find email on the main page, try contact pages
+    // Pass the already-fetched HTML to avoid re-fetching the same URL
     if (!result.contactEmail) {
-      result.contactEmail = await extractContactEmail(url);
+      result.contactEmail = await extractContactEmail(url, html);
     }
   } catch {
     // Silent fail — we'll still have empty but valid result

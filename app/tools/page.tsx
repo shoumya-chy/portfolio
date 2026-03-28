@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Wrench, Sparkles, ArrowRight, Send, Newspaper } from "lucide-react";
+import { Wrench, Sparkles, ArrowRight, Send, Newspaper, Globe } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -32,6 +32,14 @@ const tools = [
     color: "var(--color-purple)",
     icon: Newspaper,
     href: "/tools/haro-responder",
+  },
+  {
+    title: "Directory Submitter",
+    desc: "Automatically submits your websites to 60+ free web directories to build backlinks and improve domain authority. Add a site and let it run on autopilot.",
+    status: "Live",
+    color: "var(--color-orange)",
+    icon: Globe,
+    href: "/tools/directory-submitter",
   },
 ];
 

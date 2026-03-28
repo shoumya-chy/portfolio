@@ -460,17 +460,19 @@ function generateBulkSearchPhrases(niche: string): string[] {
     phrases.push(`${n}${pattern}`);
   }
 
-  const inurlPatterns = [
+  // URL-based search patterns (using quoted URL slugs instead of Google's inurl: operator)
+  const urlPatterns = [
     "write-for-us", "guest-post", "contribute", "submit-guest-post",
     "guest-post-guidelines", "become-a-contributor",
   ];
-  for (const pattern of inurlPatterns) {
-    phrases.push(`inurl:${pattern} ${n}`);
+  for (const pattern of urlPatterns) {
+    phrases.push(`${n}"${pattern}"`);
   }
 
-  phrases.push(`intitle:"write for us" ${n}`);
-  phrases.push(`intitle:"guest post" ${n}`);
-  phrases.push(`intitle:"contribute" ${n}`);
+  // Additional query variations
+  phrases.push(`${n}site accepting guest posts`);
+  phrases.push(`${n}submit article guest blog`);
+  phrases.push(`${n}looking for guest writers`);
 
   if (niche) {
     const nicheWords = niche.split(/\s+/);
