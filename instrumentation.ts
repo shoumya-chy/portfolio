@@ -7,6 +7,8 @@
  * services (SMTP, DuckDuckGo, etc.) that resolve to IPv6 first.
  */
 export async function register() {
-  const dns = await import("dns");
-  dns.setDefaultResultOrder("ipv4first");
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const dns = await import("node:dns");
+    dns.setDefaultResultOrder("ipv4first");
+  }
 }
