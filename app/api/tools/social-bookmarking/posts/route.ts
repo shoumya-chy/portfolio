@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { getAuthFromCookies } from "@/lib/auth";
-import { getSite, listPosts, savePost, savePosts, deletePost } from "@/lib/social-bookmarking/storage";
+import { getSite, listPosts, savePost, savePosts, deletePost, saveSite } from "@/lib/social-bookmarking/storage";
 import { discoverFeeds, fetchFromSitemap, fetchFromRSS, enrichPostTitle } from "@/lib/social-bookmarking/fetcher";
+import { fetchWordPressData } from "@/lib/api-clients/wordpress-client";
+import { getSites } from "@/lib/config";
 import type { BookmarkPost } from "@/lib/social-bookmarking/types";
+
+function generateId(): string {
+  return `post_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export async function GET(req: Request) {
   const isAdmin = await getAuthFromCookies();
@@ -13,7 +19,7 @@ export async function GET(req: Request) {
   return NextResponse.json({ posts: listPosts(siteId || undefined) });
 }
 
-/** POST — Fetch posts from sitemap/RSS */
+/** POST — Fetch posts. Tries WordPress API first, then sitemap/RSS */
 export async function POST(req: Request) {
   const isAdmin = await getAuthFromCookies();
   if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,70 +34,108 @@ export async function POST(req: Request) {
   const existingUrls = new Set(existingPosts.map((p) => p.url));
 
   let newPosts: BookmarkPost[] = [];
+  let source = "";
 
-  // Auto-discover feeds if not set
-  let sitemapUrl = site.sitemapUrl;
-  let rssUrl = site.rssUrl;
+  // ===== Strategy 1: WordPress SEO Bridge API (best data quality) =====
+  const configSites = getSites();
+  // Match by URL — strip trailing slashes for comparison
+  const normalizeUrl = (u: string) => u.replace(/\/+$/, "").toLowerCase();
+  const wpSite = configSites.find(
+    (s) => normalizeUrl(s.url) === normalizeUrl(site.url),
+  );
 
-  if (!sitemapUrl && !rssUrl) {
-    const feeds = await discoverFeeds(site.url);
-    sitemapUrl = feeds.sitemapUrl;
-    rssUrl = feeds.rssUrl;
+  if (wpSite?.wpApiUrl && wpSite?.wpApiKey) {
+    try {
+      const wpData = await fetchWordPressData(wpSite.url);
+      if (wpData?.content?.length) {
+        source = "wordpress";
+        for (const wp of wpData.content) {
+          if (wp.type !== "post") continue; // Only blog posts, not pages
+          if (existingUrls.has(wp.url)) continue;
 
-    // Save discovered URLs back to site
-    if (sitemapUrl || rssUrl) {
-      site.sitemapUrl = sitemapUrl || site.sitemapUrl;
-      site.rssUrl = rssUrl || site.rssUrl;
-      const { saveSite } = await import("@/lib/social-bookmarking/storage");
-      saveSite(site);
+          newPosts.push({
+            id: generateId(),
+            siteId,
+            url: wp.url,
+            title: wp.title,
+            description: wp.excerpt?.replace(/<[^>]+>/g, "").substring(0, 300) || wp.seo?.metaDescription || "",
+            tags: [
+              ...(wp.tags || []),
+              ...(wp.categories || []),
+              ...(wp.seo?.focusKeyword ? [wp.seo.focusKeyword] : []),
+            ].slice(0, 10),
+            source: "rss", // Use "rss" since it has full metadata like RSS
+            discoveredAt: wp.publishedAt || new Date().toISOString(),
+            submitted: false,
+          });
+        }
+      }
+    } catch (err) {
+      console.log("[Social-Bookmarking] WordPress fetch failed:", err instanceof Error ? err.message : err);
+      // Fall through to sitemap/RSS
     }
   }
 
-  // Fetch from RSS first (has titles + descriptions)
-  if (rssUrl) {
-    const rssPosts = await fetchFromRSS(rssUrl, siteId, existingUrls);
-    for (const p of rssPosts) existingUrls.add(p.url);
-    newPosts.push(...rssPosts);
-  }
+  // ===== Strategy 2: Sitemap / RSS (fallback) =====
+  if (newPosts.length === 0) {
+    let sitemapUrl = site.sitemapUrl;
+    let rssUrl = site.rssUrl;
 
-  // Then from sitemap (more comprehensive but less metadata)
-  if (sitemapUrl) {
-    const sitemapPosts = await fetchFromSitemap(sitemapUrl, siteId, existingUrls);
-    newPosts.push(...sitemapPosts);
+    if (!sitemapUrl && !rssUrl) {
+      const feeds = await discoverFeeds(site.url);
+      sitemapUrl = feeds.sitemapUrl;
+      rssUrl = feeds.rssUrl;
+
+      if (sitemapUrl || rssUrl) {
+        site.sitemapUrl = sitemapUrl || site.sitemapUrl;
+        site.rssUrl = rssUrl || site.rssUrl;
+        saveSite(site);
+      }
+    }
+
+    // RSS first (better metadata)
+    if (rssUrl) {
+      const rssPosts = await fetchFromRSS(rssUrl, siteId, existingUrls);
+      for (const p of rssPosts) existingUrls.add(p.url);
+      newPosts.push(...rssPosts);
+      if (newPosts.length > 0) source = "rss";
+    }
+
+    // Then sitemap
+    if (sitemapUrl) {
+      const sitemapPosts = await fetchFromSitemap(sitemapUrl, siteId, existingUrls);
+      newPosts.push(...sitemapPosts);
+      if (!source && newPosts.length > 0) source = "sitemap";
+    }
+
+    // Enrich titles for sitemap posts
+    if (source === "sitemap") {
+      const toEnrich = newPosts.filter((p) => p.source === "sitemap").slice(0, 30);
+      for (let i = 0; i < toEnrich.length; i++) {
+        const idx = newPosts.findIndex((p) => p.id === toEnrich[i].id);
+        if (idx >= 0) {
+          newPosts[idx] = await enrichPostTitle(newPosts[idx]);
+        }
+        if (i < toEnrich.length - 1) await new Promise((r) => setTimeout(r, 300));
+      }
+    }
   }
 
   if (newPosts.length === 0) {
     return NextResponse.json({
       posts: existingPosts,
       newCount: 0,
-      message: sitemapUrl || rssUrl
-        ? "No new posts found"
-        : "Could not discover sitemap or RSS feed. Add URLs manually or configure sitemap/RSS in site settings.",
+      message: "No new posts found. Check that your site URL matches the config, or add a sitemap/RSS URL.",
     });
   }
 
-  // Enrich titles for sitemap-discovered posts (first 20 to avoid rate limiting)
-  const toEnrich = newPosts.filter((p) => p.source === "sitemap").slice(0, 20);
-  for (let i = 0; i < toEnrich.length; i++) {
-    const idx = newPosts.findIndex((p) => p.id === toEnrich[i].id);
-    if (idx >= 0) {
-      newPosts[idx] = await enrichPostTitle(newPosts[idx]);
-    }
-    // Small delay
-    if (i < toEnrich.length - 1) {
-      await new Promise((r) => setTimeout(r, 500));
-    }
-  }
-
-  // Save all posts
   const allPosts = [...existingPosts, ...newPosts];
   savePosts(allPosts);
 
   return NextResponse.json({
     posts: allPosts,
     newCount: newPosts.length,
-    sitemapUrl,
-    rssUrl,
+    source,
   });
 }
 
@@ -106,7 +150,7 @@ export async function PUT(req: Request) {
   }
 
   const post: BookmarkPost = {
-    id: `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: generateId(),
     siteId: body.siteId,
     url: body.url,
     title: body.title,
