@@ -1,6 +1,12 @@
 /**
  * Sitemap & RSS fetcher.
  * Auto-discovers posts from a site's sitemap.xml or RSS feed.
+ *
+ * Key design decisions:
+ * - Don't reject on HTTP status codes — some servers (e.g. WordPress with
+ *   certain SEO plugins) return 404 status but still serve valid XML.
+ * - Use regex-based extraction as fallback when Cheerio xmlMode
+ *   struggles with namespaced XML.
  */
 
 import * as cheerio from "cheerio";
@@ -15,6 +21,75 @@ const BROWSER_HEADERS: Record<string, string> = {
 
 function generateId(): string {
   return `post_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Fetch a URL and return the body text regardless of HTTP status,
+ * as long as the body looks like XML.
+ */
+async function fetchXml(url: string, timeoutMs = 15000): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const text = await res.text();
+    // Accept if it looks like XML, regardless of status code
+    if (text.includes("<?xml") || text.includes("<urlset") || text.includes("<sitemapindex") ||
+        text.includes("<rss") || text.includes("<feed") || text.includes("<channel")) {
+      return text;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract <loc> values from sitemap XML using regex.
+ * Works reliably regardless of XML namespaces.
+ */
+function extractLocs(xml: string): string[] {
+  const locs: string[] = [];
+  const regex = /<loc>\s*(.*?)\s*<\/loc>/gi;
+  let match;
+  while ((match = regex.exec(xml)) !== null) {
+    const url = match[1].trim();
+    if (url) locs.push(url);
+  }
+  return locs;
+}
+
+/**
+ * Extract <url> blocks with <loc> and optional <lastmod>.
+ */
+function extractUrlEntries(xml: string): Array<{ loc: string; lastmod?: string }> {
+  const entries: Array<{ loc: string; lastmod?: string }> = [];
+  const urlBlockRegex = /<url>([\s\S]*?)<\/url>/gi;
+  let block;
+  while ((block = urlBlockRegex.exec(xml)) !== null) {
+    const content = block[1];
+    const locMatch = content.match(/<loc>\s*(.*?)\s*<\/loc>/i);
+    if (!locMatch) continue;
+    const loc = locMatch[1].trim();
+    const lastmodMatch = content.match(/<lastmod>\s*(.*?)\s*<\/lastmod>/i);
+    entries.push({ loc, lastmod: lastmodMatch?.[1]?.trim() });
+  }
+  return entries;
+}
+
+/**
+ * Extract child sitemap URLs from a sitemap index.
+ */
+function extractSitemapLocs(xml: string): string[] {
+  const locs: string[] = [];
+  const sitemapBlockRegex = /<sitemap>([\s\S]*?)<\/sitemap>/gi;
+  let block;
+  while ((block = sitemapBlockRegex.exec(xml)) !== null) {
+    const locMatch = block[1].match(/<loc>\s*(.*?)\s*<\/loc>/i);
+    if (locMatch) locs.push(locMatch[1].trim());
+  }
+  return locs;
 }
 
 /**
@@ -33,19 +108,11 @@ export async function discoverFeeds(siteUrl: string): Promise<{ sitemapUrl?: str
   ];
 
   for (const url of sitemapCandidates) {
-    try {
-      const res = await fetch(url, {
-        headers: BROWSER_HEADERS,
-        signal: AbortSignal.timeout(10000),
-      });
-      if (res.ok) {
-        const text = await res.text();
-        if (text.includes("<urlset") || text.includes("<sitemapindex")) {
-          result.sitemapUrl = url;
-          break;
-        }
-      }
-    } catch { /* continue */ }
+    const xml = await fetchXml(url, 10000);
+    if (xml && (xml.includes("<urlset") || xml.includes("<sitemapindex"))) {
+      result.sitemapUrl = url;
+      break;
+    }
   }
 
   // Try common RSS feed locations
@@ -59,19 +126,11 @@ export async function discoverFeeds(siteUrl: string): Promise<{ sitemapUrl?: str
   ];
 
   for (const url of rssCandidates) {
-    try {
-      const res = await fetch(url, {
-        headers: BROWSER_HEADERS,
-        signal: AbortSignal.timeout(10000),
-      });
-      if (res.ok) {
-        const text = await res.text();
-        if (text.includes("<rss") || text.includes("<feed") || text.includes("<channel")) {
-          result.rssUrl = url;
-          break;
-        }
-      }
-    } catch { /* continue */ }
+    const xml = await fetchXml(url, 10000);
+    if (xml && (xml.includes("<rss") || xml.includes("<feed") || xml.includes("<channel"))) {
+      result.rssUrl = url;
+      break;
+    }
   }
 
   // Also try parsing the homepage for feed links
@@ -102,6 +161,7 @@ export async function discoverFeeds(siteUrl: string): Promise<{ sitemapUrl?: str
 /**
  * Parse posts from a sitemap XML.
  * Handles both sitemap index and regular sitemaps.
+ * Uses regex extraction to handle namespaced XML reliably.
  */
 export async function fetchFromSitemap(
   sitemapUrl: string,
@@ -111,30 +171,18 @@ export async function fetchFromSitemap(
   const posts: BookmarkPost[] = [];
 
   try {
-    const res = await fetch(sitemapUrl, {
-      headers: BROWSER_HEADERS,
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return posts;
-
-    const xml = await res.text();
-    const $ = cheerio.load(xml, { xmlMode: true });
+    const xml = await fetchXml(sitemapUrl);
+    if (!xml) return posts;
 
     // Check if it's a sitemap index
-    const sitemapLocs = $("sitemap > loc");
-    if (sitemapLocs.length > 0) {
-      // It's a sitemap index — parse child sitemaps (prefer post sitemaps)
-      const childUrls: string[] = [];
-      sitemapLocs.each((_, el) => {
-        const loc = $(el).text().trim();
-        if (loc) childUrls.push(loc);
-      });
+    if (xml.includes("<sitemapindex")) {
+      const childUrls = extractSitemapLocs(xml);
 
-      // Prioritize post sitemaps
+      // Prioritize post/blog/article sitemaps
       const postSitemaps = childUrls.filter(
         (u) => u.includes("post") || u.includes("blog") || u.includes("article"),
       );
-      const toFetch = postSitemaps.length > 0 ? postSitemaps : childUrls.slice(0, 3);
+      const toFetch = postSitemaps.length > 0 ? postSitemaps : childUrls.slice(0, 5);
 
       for (const childUrl of toFetch) {
         const childPosts = await fetchFromSitemap(childUrl, siteId, existingUrls);
@@ -143,15 +191,16 @@ export async function fetchFromSitemap(
       return posts;
     }
 
-    // Regular sitemap — extract URLs
-    $("url").each((_, el) => {
-      const loc = $(el).find("loc").text().trim();
-      if (!loc || existingUrls.has(loc)) return;
+    // Regular sitemap — extract URL entries using regex
+    const entries = extractUrlEntries(xml);
+
+    for (const entry of entries) {
+      if (!entry.loc || existingUrls.has(entry.loc)) continue;
 
       // Skip non-content pages
-      const lower = loc.toLowerCase();
+      const lower = entry.loc.toLowerCase();
       if (
-        lower.endsWith("/") && lower.split("/").filter(Boolean).length <= 3 || // homepage or category
+        (lower.endsWith("/") && lower.split("/").filter(Boolean).length <= 3) ||
         lower.includes("/tag/") ||
         lower.includes("/category/") ||
         lower.includes("/author/") ||
@@ -162,23 +211,21 @@ export async function fetchFromSitemap(
         lower.endsWith(".jpg") ||
         lower.endsWith(".png")
       ) {
-        return;
+        continue;
       }
-
-      const lastmod = $(el).find("lastmod").text().trim();
 
       posts.push({
         id: generateId(),
         siteId,
-        url: loc,
-        title: extractTitleFromUrl(loc),
+        url: entry.loc,
+        title: extractTitleFromUrl(entry.loc),
         description: "",
         tags: [],
         source: "sitemap",
-        discoveredAt: lastmod || new Date().toISOString(),
+        discoveredAt: entry.lastmod || new Date().toISOString(),
         submitted: false,
       });
-    });
+    }
   } catch { /* ignore fetch errors */ }
 
   return posts;
@@ -195,13 +242,9 @@ export async function fetchFromRSS(
   const posts: BookmarkPost[] = [];
 
   try {
-    const res = await fetch(rssUrl, {
-      headers: BROWSER_HEADERS,
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return posts;
+    const xml = await fetchXml(rssUrl);
+    if (!xml) return posts;
 
-    const xml = await res.text();
     const $ = cheerio.load(xml, { xmlMode: true });
 
     // RSS 2.0
@@ -213,14 +256,12 @@ export async function fetchFromRSS(
       const desc = $(el).find("description").first().text().trim();
       const pubDate = $(el).find("pubDate").first().text().trim();
 
-      // Extract categories/tags
       const tags: string[] = [];
       $(el).find("category").each((_, cat) => {
         const tag = $(cat).text().trim();
         if (tag) tags.push(tag);
       });
 
-      // Clean HTML from description
       const cleanDesc = desc.replace(/<[^>]+>/g, "").substring(0, 300);
 
       posts.push({
@@ -278,7 +319,7 @@ export async function fetchFromRSS(
  */
 export async function enrichPostTitle(post: BookmarkPost): Promise<BookmarkPost> {
   if (post.title && !post.title.includes("-") && post.title.length > 5) {
-    return post; // Already has a good title
+    return post;
   }
 
   try {
@@ -303,7 +344,6 @@ export async function enrichPostTitle(post: BookmarkPost): Promise<BookmarkPost>
       $('meta[property="og:description"]').attr("content")?.trim() ||
       "";
 
-    // Extract tags from meta keywords if no tags
     let tags = post.tags;
     if (tags.length === 0) {
       const keywords = $('meta[name="keywords"]').attr("content")?.trim();
