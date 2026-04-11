@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Wrench, Sparkles, ArrowRight, Send, Newspaper, Globe, Bookmark } from "lucide-react";
+import { Wrench, Sparkles, ArrowRight, Send, Newspaper, Globe, Bookmark, Image, Search } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -48,6 +48,22 @@ const tools = [
     color: "var(--color-purple)",
     icon: Bookmark,
     href: "/tools/social-bookmarking",
+  },
+  {
+    title: "Pinterest Auto-Pinner",
+    desc: "Fetches WordPress posts, scores by keyword value, generates AI pin images via Stability AI, and publishes to Pinterest daily. Multi-site support.",
+    status: "Live",
+    color: "#ef4444",
+    icon: Image,
+    href: "/tools/pinterest",
+  },
+  {
+    title: "Bing Indexer",
+    desc: "Submit your full sitemap, individual pages, or any batch of URLs to Bing via IndexNow. Indexes posts one-by-one with configurable rate limiting — keeping every page discoverable.",
+    status: "Live",
+    color: "var(--color-accent)",
+    icon: Search,
+    href: "/tools/bing-indexer",
   },
 ];
 

@@ -20,6 +20,7 @@ export interface AppConfig {
     bing: string;
     dataForSeoLogin?: string;
     dataForSeoPassword?: string;
+    stabilityAi?: string;
   };
   gsc: {
     credentialsJson: string;
@@ -72,7 +73,7 @@ export function writeConfig(config: AppConfig): void {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
 }
 
-export function getApiKey(key: "anthropic" | "bing" | "dataForSeoLogin" | "dataForSeoPassword"): string {
+export function getApiKey(key: "anthropic" | "bing" | "dataForSeoLogin" | "dataForSeoPassword" | "stabilityAi"): string {
   return readConfig().apiKeys[key as keyof AppConfig["apiKeys"]] || "";
 }
 
