@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Search,
   Link2,
@@ -79,6 +79,31 @@ export function BingIndexerDashboard() {
   const [host, setHost] = useState("");
   const [delay, setDelay] = useState(3);
   const [showSettings, setShowSettings] = useState(true);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Prefill API key + host from the admin settings on mount so users don't
+  // have to paste them on every visit. Silently ignores auth/network errors;
+  // the form still accepts manual input as a fallback.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/bing-indexer/config");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.key) setApiKey(data.key);
+        if (data.host) setHost(data.host);
+      } catch {
+        // Ignore — form still accepts manual input
+      } finally {
+        if (!cancelled) setConfigLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Mode
   const [mode, setMode] = useState<Mode>("sitemap");
@@ -432,6 +457,19 @@ export function BingIndexerDashboard() {
                 </div>
               )}
             </div>
+
+            {configLoaded && (apiKey || host) && (
+              <p className="text-xs text-[var(--color-green)] mt-2">
+                Loaded from{" "}
+                <a
+                  href="/admin/settings"
+                  className="underline hover:text-[var(--color-accent)]"
+                >
+                  Settings
+                </a>{" "}
+                — you can override the values below for a single run.
+              </p>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-4 mt-2">
               <div>

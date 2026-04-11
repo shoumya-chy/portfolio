@@ -21,6 +21,11 @@ export async function GET() {
       googleCSEId: config.outreach?.googleCSEId ? `...${config.outreach.googleCSEId.slice(-8)}` : "",
       googleCSEApiKey: config.outreach?.googleCSEApiKey ? `...${config.outreach.googleCSEApiKey.slice(-8)}` : "",
     },
+    indexNow: {
+      hasKey: !!config.indexNow?.key,
+      keyPreview: config.indexNow?.key ? `...${config.indexNow.key.slice(-8)}` : "",
+      host: config.indexNow?.host || "",
+    },
     sites: config.sites,
   });
 }
@@ -62,6 +67,19 @@ export async function PUT(req: Request) {
     if (body.googleCSEApiKey !== undefined) {
       if (!config.outreach) config.outreach = { googleCSEId: "" };
       config.outreach.googleCSEApiKey = body.googleCSEApiKey;
+    }
+
+    // Update IndexNow settings
+    if (body.indexNowKey !== undefined) {
+      if (!config.indexNow) config.indexNow = { key: "", host: "" };
+      config.indexNow.key = body.indexNowKey;
+    }
+    if (body.indexNowHost !== undefined) {
+      if (!config.indexNow) config.indexNow = { key: "", host: "" };
+      // Strip protocol + trailing slash for consistency
+      config.indexNow.host = body.indexNowHost
+        .replace(/^https?:\/\//, "")
+        .replace(/\/$/, "");
     }
 
     // Update admin password

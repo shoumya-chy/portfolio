@@ -29,6 +29,10 @@ export interface AppConfig {
     googleCSEId: string;
     googleCSEApiKey?: string;
   };
+  indexNow?: {
+    key: string;
+    host: string;
+  };
   sites: SiteConfig[];
 }
 
@@ -46,6 +50,7 @@ const DEFAULT_CONFIG: AppConfig = {
   apiKeys: { anthropic: "", bing: "" },
   gsc: { credentialsJson: "" },
   outreach: { googleCSEId: "" },
+  indexNow: { key: "", host: "" },
   sites: [],
 };
 
@@ -92,6 +97,14 @@ export function getGoogleCSEApiKey(): string {
 
 export function getSites(): SiteConfig[] {
   return readConfig().sites || [];
+}
+
+export function getIndexNowConfig(): { key: string; host: string } {
+  const cfg = readConfig();
+  return {
+    key: cfg.indexNow?.key || "",
+    host: cfg.indexNow?.host || "",
+  };
 }
 
 export function getAdminEmail(): string {

@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getIndexNowConfig } from "@/lib/config";
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, key, host } = await req.json();
+    const body = await req.json();
+    const url: string | undefined = body.url;
+
+    // Fall back to server-stored IndexNow config when client omits fields
+    const saved = getIndexNowConfig();
+    const key: string = body.key || saved.key || "";
+    const host: string = body.host || saved.host || "";
 
     if (!url || !key || !host) {
       return NextResponse.json(
-        { error: "Missing required fields: url, key, host" },
+        { error: "Missing required fields: url, key, host (configure the IndexNow key + host in Settings or pass them per request)" },
         { status: 400 }
       );
     }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Key, Shield, Save, Loader2, Eye, EyeOff, CheckCircle, Search } from "lucide-react";
+import { Key, Shield, Save, Loader2, Eye, EyeOff, CheckCircle, Search, Globe } from "lucide-react";
 
 interface SettingsData {
   admin: { email: string; hasPassword: boolean };
   apiKeys: { anthropic: string; bing: string; dataForSeoLogin?: string; dataForSeoPassword?: string };
   gsc: { hasCredentials: boolean };
   outreach?: { googleCSEId: string; googleCSEApiKey: string };
+  indexNow?: { hasKey: boolean; keyPreview: string; host: string };
 }
 
 interface Props {
@@ -23,6 +24,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
   const [googleCSEApiKey, setGoogleCSEApiKey] = useState("");
   const [dfLogin, setDfLogin] = useState("");
   const [dfPassword, setDfPassword] = useState("");
+  const [indexNowKey, setIndexNowKey] = useState("");
+  const [indexNowHost, setIndexNowHost] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,6 +43,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
       if (googleCSEApiKey) body.googleCSEApiKey = googleCSEApiKey;
       if (dfLogin) body.dataForSeoLogin = dfLogin;
       if (dfPassword) body.dataForSeoPassword = dfPassword;
+      if (indexNowKey) body.indexNowKey = indexNowKey;
+      if (indexNowHost) body.indexNowHost = indexNowHost;
       if (newPassword) body.newPassword = newPassword;
 
       const res = await fetch("/api/admin/settings", {
@@ -57,6 +62,8 @@ export function SettingsForm({ settings, onSaved }: Props) {
       setGoogleCSEApiKey("");
       setDfLogin("");
       setDfPassword("");
+      setIndexNowKey("");
+      setIndexNowHost("");
       setNewPassword("");
       onSaved();
     } catch {
@@ -177,6 +184,43 @@ export function SettingsForm({ settings, onSaved }: Props) {
         </div>
       </div>
 
+      {/* IndexNow (Bing Indexer) */}
+      <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
+        <div className="flex items-center gap-2 mb-4">
+          <Globe size={18} className="text-[var(--color-accent)]" />
+          <h3 className="font-semibold">IndexNow (Bing Indexer)</h3>
+        </div>
+        <p className="text-xs text-[var(--color-text-dim)] mb-4">
+          Saved once here, these values auto-fill the Bing Indexer tool so you don&apos;t have to paste them on every run.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-[var(--color-text-dim)] mb-1">
+              IndexNow API Key {settings.indexNow?.hasKey && <span className="text-[var(--color-green)]">(configured: {settings.indexNow.keyPreview})</span>}
+            </label>
+            <input
+              type="password"
+              value={indexNowKey}
+              onChange={(e) => setIndexNowKey(e.target.value)}
+              placeholder="your-indexnow-key"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--color-text-dim)] mb-1">
+              Default Website Host {settings.indexNow?.host && <span className="text-[var(--color-green)]">(configured: {settings.indexNow.host})</span>}
+            </label>
+            <input
+              type="text"
+              value={indexNowHost}
+              onChange={(e) => setIndexNowHost(e.target.value)}
+              placeholder="example.com"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-sm font-mono text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-accent)]"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Password */}
       <div className="p-5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl">
         <div className="flex items-center gap-2 mb-4">
@@ -211,7 +255,7 @@ export function SettingsForm({ settings, onSaved }: Props) {
       <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
-          disabled={saving || (!anthropicKey && !bingKey && !gscJson && !googleCSEId && !googleCSEApiKey && !dfLogin && !dfPassword && !newPassword)}
+          disabled={saving || (!anthropicKey && !bingKey && !gscJson && !googleCSEId && !googleCSEApiKey && !dfLogin && !dfPassword && !indexNowKey && !indexNowHost && !newPassword)}
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white rounded-lg transition-all disabled:opacity-50"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
