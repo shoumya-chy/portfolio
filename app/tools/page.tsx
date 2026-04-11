@@ -120,12 +120,16 @@ export default function ToolsPage() {
                 <span
                   className="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-md border"
                   style={{
-                    color: tool.color,
-                    borderColor: tool.color,
+                    color: isLive ? "var(--color-green)" : "var(--color-text-dim)",
+                    borderColor: isLive
+                      ? "color-mix(in srgb, var(--color-green) 30%, transparent)"
+                      : "var(--color-border)",
+                    backgroundColor: isLive
+                      ? "color-mix(in srgb, var(--color-green) 10%, transparent)"
+                      : "transparent",
                   }}
                 >
                   {tool.status}
-                  {isLive && <ArrowRight size={12} />}
                 </span>
               </Wrapper>
             );

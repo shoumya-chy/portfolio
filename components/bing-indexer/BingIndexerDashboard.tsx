@@ -238,37 +238,18 @@ export function BingIndexerDashboard() {
     }
   }
 
-  // ─── Submit a single URL via IndexNow ────────────────────────────────────
+  // ─── Submit a single URL via server-side proxy (avoids CORS) ────────────
 
   async function submitUrl(url: string): Promise<{ ok: boolean; message: string }> {
-    const cleanHost = host.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const keyLocation = `https://${cleanHost}/${apiKey}.txt`;
-
     try {
-      const res = await fetch("https://api.indexnow.org/IndexNow", {
+      const res = await fetch("/api/bing-indexer/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          host: cleanHost,
-          key: apiKey,
-          keyLocation,
-          urlList: [url],
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, key: apiKey, host }),
       });
 
-      if (res.status === 200 || res.status === 202) {
-        return { ok: true, message: `HTTP ${res.status} — accepted` };
-      } else if (res.status === 400) {
-        return { ok: false, message: "Bad request (check URL format)" };
-      } else if (res.status === 403) {
-        return { ok: false, message: "Forbidden — invalid API key" };
-      } else if (res.status === 422) {
-        return { ok: false, message: "Unprocessable — URL doesn't match host" };
-      } else if (res.status === 429) {
-        return { ok: false, message: "Rate limited — slow down submissions" };
-      } else {
-        return { ok: false, message: `HTTP ${res.status}` };
-      }
+      const data = await res.json();
+      return { ok: data.ok ?? false, message: data.message ?? `HTTP ${res.status}` };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       return { ok: false, message: msg };

@@ -163,9 +163,9 @@ export function AdminDashboard({ onLogout }: Props) {
 
   const exportCSV = () => {
     if (!discovery?.recommendations.length) return;
-    const header = "Rank,Topic,Cluster,Source,Score,Rationale\n";
+    const header = "Rank,SuggestedTitle,Topic,Cluster,Source,Score,Rationale\n";
     const rows = discovery.recommendations
-      .map((r, i) => `${i + 1},"${r.topic.replace(/"/g, '""')}","${r.cluster}","${r.source}",${r.score},"${r.rationale.replace(/"/g, '""')}"`)
+      .map((r, i) => `${i + 1},"${(r.suggestedTitle || "").replace(/"/g, '""')}","${r.topic.replace(/"/g, '""')}","${r.cluster}","${r.source}",${r.score},"${r.rationale.replace(/"/g, '""')}"`)
       .join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -326,7 +326,10 @@ export function AdminDashboard({ onLogout }: Props) {
                   <tr key={i} className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-bg-card)] transition-colors">
                     <td className="py-3 px-3 text-[var(--color-text-dim)] font-mono">{i + 1}</td>
                     <td className="py-3 px-3">
-                      <div className="font-medium mb-1">{rec.topic}</div>
+                      <div className="font-medium mb-1">{rec.suggestedTitle || rec.topic}</div>
+                      {rec.suggestedTitle && rec.suggestedTitle !== rec.topic && (
+                        <div className="text-xs text-[var(--color-text-dim)] italic mb-1">Query: {rec.topic}</div>
+                      )}
                       <div className="text-xs text-[var(--color-text-dim)]">{rec.rationale}</div>
                       <div className="sm:hidden mt-1">
                         <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-dim)]">

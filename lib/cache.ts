@@ -13,6 +13,8 @@ const TTL: Record<string, number> = {
   wordpress: 15 * 60 * 1000,
   "gsc-pages": 24 * 60 * 60 * 1000,
   discovery: 24 * 60 * 60 * 1000,
+  niches: 7 * 24 * 60 * 60 * 1000,      // Niche profile - stable, refresh weekly
+  "quora-niche": 3 * 24 * 60 * 60 * 1000, // Quora results per niche - 3 days
 };
 
 function ensureDir(dir: string) {

@@ -31,6 +31,20 @@ export interface TrendingTopic {
   subreddit?: string;
   source: "reddit" | "quora";
   fetchedAt: string;
+  matchedNiche?: string;    // Which niche this topic came from (Quora)
+  relevanceScore?: number;  // 0-100 relevance to site (from Claude filter)
+}
+
+// ============ Site Niche Profile (multi-niche WP sites) ============
+export interface SiteNicheProfile {
+  siteUrl: string;
+  niches: string[];                // 3-7 core content themes derived from WP
+  geography: string | null;        // "Australia", "US", "UK", null if global
+  audience: string;                // "beginners", "professionals", etc.
+  quoraSearchQueries: string[];    // Ready-to-run Quora search queries
+  primaryKeywords: string[];       // Seed keywords for DataForSEO enrichment
+  wpPostsAnalyzed: number;
+  analyzedAt: string;
 }
 
 // ============ Page-Keyword Mapping (GSC) ============
@@ -78,6 +92,7 @@ export interface TopicCandidate {
 // ============ Final Recommendation (Claude output) ============
 export interface TopicRecommendation {
   topic: string;
+  suggestedTitle?: string;  // Catchy blog headline (Claude-generated)
   cluster: string;
   rationale: string;
   score: number;
